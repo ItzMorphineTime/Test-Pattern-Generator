@@ -30,7 +30,10 @@ def _line_alpha_1d(length: int, cfg: LineGroupConfig, frame_index: int,
                    total_frames: int) -> np.ndarray:
     """Coverage in ``[0, 1]`` along one axis for a group of moving lines."""
     coords = np.arange(length, dtype=np.float32)
-    travel = (frame_index * cfg.speed * cfg.direction) / max(1, total_frames)
+    # A whole number of sweeps per loop guarantees the motion returns to its
+    # start on the wrap frame; free mode uses the raw speed.
+    sweeps = round(cfg.speed) if cfg.seamless else cfg.speed
+    travel = (frame_index * sweeps * cfg.direction) / max(1, total_frames)
     alpha = np.zeros(length, dtype=np.float32)
 
     count = max(1, cfg.count)

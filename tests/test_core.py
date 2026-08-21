@@ -68,6 +68,28 @@ def test_integer_speed_lines_are_seamless():
     assert np.array_equal(r.render(0), r.render(n))
 
 
+def test_seamless_rounds_fractional_speed_and_still_loops():
+    cfg = _tiny()
+    cfg.color_loop.enabled = False
+    cfg.h_lines.enabled = True
+    cfg.h_lines.count = 1
+    cfg.h_lines.speed = 2.4  # rounds to 2 whole sweeps
+    cfg.h_lines.seamless = True
+    r = FrameRenderer(cfg)
+    assert np.array_equal(r.render(0), r.render(cfg.total_frames()))
+
+
+def test_free_mode_uses_raw_speed_and_need_not_loop():
+    cfg = _tiny()
+    cfg.color_loop.enabled = False
+    cfg.h_lines.enabled = True
+    cfg.h_lines.count = 1
+    cfg.h_lines.speed = 2.4
+    cfg.h_lines.seamless = False
+    r = FrameRenderer(cfg)
+    assert not np.array_equal(r.render(0), r.render(cfg.total_frames()))
+
+
 def test_soft_and_solid_lines_render_without_error():
     for style in (LineStyle.SOLID, LineStyle.SOFT):
         cfg = _tiny()

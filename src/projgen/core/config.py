@@ -68,9 +68,13 @@ class LineGroupConfig:
     thickness: int = 4  # pixels
     color: RGB = (1.0, 1.0, 1.0)
     opacity: float = 1.0
-    speed: int = 1       # integer sweeps per loop -> stays seamless
+    speed: float = 1.0   # sweeps per loop
     direction: int = 1   # +1 / -1
     style: LineStyle = LineStyle.SOLID
+    # When True the sweep count is rounded to a whole number so the line motion
+    # loops perfectly with the video. When False, `speed` is used as-is (free
+    # motion that need not return to its start).
+    seamless: bool = True
 
 
 @dataclass

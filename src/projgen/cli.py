@@ -62,10 +62,12 @@ def build_parser() -> argparse.ArgumentParser:
         g.add_argument(f"--{tag}lines", type=int, metavar="COUNT",
                        help=f"Enable {name} lines with COUNT lines.")
         g.add_argument(f"--{tag}line-thickness", type=int)
-        g.add_argument(f"--{tag}line-speed", type=int, help="Integer sweeps per loop.")
+        g.add_argument(f"--{tag}line-speed", type=float, help="Sweeps per loop.")
         g.add_argument(f"--{tag}line-color", type=_parse_color, metavar="R,G,B|#hex")
         g.add_argument(f"--{tag}line-opacity", type=float)
         g.add_argument(f"--{tag}line-style", choices=("solid", "soft"))
+        g.add_argument(f"--{tag}line-free", action="store_true",
+                       help="Disable seamless looping (use the exact speed).")
 
     gr = p.add_argument_group("number grid")
     gr.add_argument("--grid", type=_parse_grid, metavar="ROWSxCOLS",
@@ -113,6 +115,8 @@ def config_from_args(args: argparse.Namespace) -> ProjectConfig:
         style = getattr(args, f"{tag}line_style")
         if style:
             group.style = LineStyle(style)
+        if getattr(args, f"{tag}line_free"):
+            group.seamless = False
 
     g = cfg.grid
     if args.grid is not None:

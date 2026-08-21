@@ -31,7 +31,7 @@ projgen-cli = "projgen.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-projgen = ["assets/fonts/*.ttf"]
+projgen = ["assets/*.ico", "assets/*.icns"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

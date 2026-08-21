@@ -1,20 +1,37 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec — builds a single-file Windows executable.
+"""Cross-platform PyInstaller spec — builds a single-file executable.
 
 Build from the repo root with:
     pyinstaller packaging/projgen.spec --clean --noconfirm
-Output: dist/ProjectionTestPatternGenerator.exe
+
+Output:
+    Windows: dist/ProjectionTestPatternGenerator.exe
+    macOS:   dist/ProjectionTestPatternGenerator            (single-file binary)
+             dist/ProjectionTestPatternGenerator.app        (app bundle)
 """
 
 import os
+import sys
 
 from PyInstaller.utils.hooks import collect_all
+
+IS_MAC = sys.platform == "darwin"
 
 # SPECPATH is injected by PyInstaller and points at this file's directory.
 ROOT = os.path.abspath(os.path.join(SPECPATH, ".."))
 SRC = os.path.join(ROOT, "src")
 
+ASSETS = os.path.join(SRC, "projgen", "assets")
+# The window/taskbar icon (loaded at runtime) is always the .ico; the platform
+# icon embedded into the executable differs (.icns on macOS, .ico on Windows).
+RUNTIME_ICON = os.path.join(ASSETS, "icon.ico")
+EXE_ICON = os.path.join(ASSETS, "icon.icns" if IS_MAC else "icon.ico")
+
 datas, binaries, hiddenimports = [], [], []
+
+# Bundle the icons so the runtime window/taskbar icon works in the frozen app.
+if os.path.exists(RUNTIME_ICON):
+    datas.append((RUNTIME_ICON, "projgen/assets"))
 
 # PyAV ships the FFmpeg shared libraries inside its package; collect them all so
 # every codec (x264/x265/vp9/av1/prores/ffv1) is available in the frozen app.
@@ -62,14 +79,27 @@ exe = EXE(
     a.datas,
     [],
     name="ProjectionTestPatternGenerator",
-    icon=os.path.join(SPECPATH, "icon.ico") if os.path.exists(
-        os.path.join(SPECPATH, "icon.ico")) else None,
+    icon=EXE_ICON if os.path.exists(EXE_ICON) else None,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
     console=False,          # GUI app: no console window
     disable_windowed_traceback=False,
-    target_arch=None,
+    target_arch=None,       # build for the host arch (Intel or Apple Silicon)
     runtime_tmpdir=None,
 )
+
+# On macOS also wrap the single-file binary in a proper .app bundle, which is
+# what users expect to double-click. The onefile binary above still works too.
+if IS_MAC:
+    app = BUNDLE(
+        exe,
+        name="ProjectionTestPatternGenerator.app",
+        icon=EXE_ICON if os.path.exists(EXE_ICON) else None,
+        bundle_identifier="com.projgen.testpattern",
+        info_plist={
+            "NSHighResolutionCapable": True,
+            "CFBundleShortVersionString": "0.1.0",
+        },
+    )

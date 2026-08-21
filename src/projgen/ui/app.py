@@ -9,8 +9,10 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThread, QTimer
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QComboBox,
     QFileDialog,
     QFormLayout,
@@ -31,6 +33,7 @@ from PySide6.QtWidgets import (
 from ..core import encoder
 from ..core.config import Axis, LabelMode, LineGroupConfig, LineStyle, ProjectConfig
 from ..core.render import FrameRenderer
+from ..resources import icon_path
 from .preview import PreviewWidget
 from .render_worker import RenderWorker
 from .style import DARK_QSS
@@ -43,6 +46,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Projection Test-Pattern Generator")
+        if icon_path():
+            self.setWindowIcon(QIcon(icon_path()))
         self.resize(1180, 760)
         self.config = ProjectConfig()
         self._worker: RenderWorker | None = None
@@ -51,22 +56,28 @@ class MainWindow(QMainWindow):
         self.preview = PreviewWidget()
 
         controls = self._build_controls()
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setWidget(controls)
-        scroll.setFixedWidth(430)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setWidget(controls)
+        self._scroll.setMinimumWidth(320)
+        self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
         right = QWidget()
+        right.setMinimumWidth(420)
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.addWidget(self.preview, 1)
         right_layout.addWidget(self._build_export_bar())
 
         splitter = QSplitter()
-        splitter.addWidget(scroll)
+        splitter.addWidget(self._scroll)
         splitter.addWidget(right)
+        splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
+        splitter.setCollapsible(0, False)
+        splitter.setChildrenCollapsible(False)
+        splitter.setSizes([440, 740])
         self.setCentralWidget(splitter)
         self.statusBar().showMessage("Ready")
 
@@ -84,7 +95,8 @@ class MainWindow(QMainWindow):
         panel = QWidget()
         panel.setObjectName("controlPanel")
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(12, 12, 12, 12)
+        # Extra right margin keeps fields clear of the vertical scrollbar.
+        layout.setContentsMargins(12, 12, 18, 12)
         layout.setSpacing(12)
 
         layout.addWidget(self._build_output_group())
@@ -177,7 +189,13 @@ class MainWindow(QMainWindow):
 
         count = int_spin(1, 200, cfg.count)
         thickness = int_spin(1, 400, cfg.thickness, 1, " px")
-        speed = int_spin(0, 200, cfg.speed)
+        speed = float_spin(0.0, 200.0, cfg.speed, 0.5, 2)
+        speed.setToolTip("How many times the lines sweep across during one loop.")
+        seamless = QCheckBox("Loop seamlessly (whole sweeps)")
+        seamless.setChecked(cfg.seamless)
+        seamless.setToolTip(
+            "On: the sweep count is rounded to a whole number so the motion loops "
+            "perfectly with the video.\nOff: uses the exact speed (free motion).")
         opacity = float_spin(0.0, 1.0, cfg.opacity, 0.05)
         style = QComboBox()
         style.addItem("Solid", LineStyle.SOLID)
@@ -193,6 +211,7 @@ class MainWindow(QMainWindow):
         count.valueChanged.connect(lambda v, k=key: self._set(f"{k}.count", v))
         thickness.valueChanged.connect(lambda v, k=key: self._set(f"{k}.thickness", v))
         speed.valueChanged.connect(lambda v, k=key: self._set(f"{k}.speed", v))
+        seamless.toggled.connect(lambda on, k=key: self._set(f"{k}.seamless", on))
         opacity.valueChanged.connect(lambda v, k=key: self._set(f"{k}.opacity", v))
         style.currentIndexChanged.connect(
             lambda _i, w=style, k=key: self._set(f"{k}.style", w.currentData()))
@@ -203,6 +222,7 @@ class MainWindow(QMainWindow):
         form.addRow("Count", count)
         form.addRow("Thickness", thickness)
         form.addRow("Speed (sweeps/loop)", speed)
+        form.addRow("", seamless)
         form.addRow("Opacity", opacity)
         form.addRow("Style", style)
         form.addRow("Direction", direction)
@@ -390,8 +410,7 @@ class MainWindow(QMainWindow):
 
     def _reload_widgets_from_config(self) -> None:
         # Simplest robust approach: rebuild the whole control panel.
-        scroll = self.centralWidget().widget(0)
-        scroll.setWidget(self._build_controls())
+        self._scroll.setWidget(self._build_controls())
         self.w_path.setText(self.config.output.output_path)
         self._sync_enabled_states()
         self._rebuild_preview()
@@ -483,6 +502,8 @@ class MainWindow(QMainWindow):
 def run() -> int:
     app = QApplication.instance() or QApplication(sys.argv)
     app.setStyleSheet(DARK_QSS)
+    if icon_path():
+        app.setWindowIcon(QIcon(icon_path()))
     window = MainWindow()
     window.show()
     return app.exec()

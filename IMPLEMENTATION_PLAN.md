@@ -15,6 +15,19 @@ horizontal/vertical tracking lines and number grids.
 | M3 — Overlays (tracking lines + number grid) | ✅ done |
 | M4 — PySide6 GUI (live preview, threaded export, presets) | ✅ done |
 | M5 — Packaging (single-file PyInstaller exe) + README | ✅ done |
+| M6 — Post-review refinements (see below) | ✅ done |
+
+**M6 refinements (from first hands-on review):**
+- **Resizable control panel** — the left sidebar is now a splitter pane (min width, not
+  fixed) and the panel reserves right-hand margin so the scrollbar no longer overlaps fields.
+- **Seamless-loop toggle for lines** — each line group has a *Loop seamlessly* option
+  (default on: whole sweeps per loop → perfect loop; off: exact/fractional speed, free
+  motion). `speed` is now a float.
+- **Cross-platform builds** — one spec builds Windows (`.exe`) and macOS (single-file
+  binary **and** `.app` bundle) with the right icon per platform (`.ico` / `.icns`).
+  Built via `packaging/build.ps1` (Windows) or `packaging/build_mac.sh` (macOS).
+- **App icon** — bundled at `src/projgen/assets/` and embedded into the executable and used
+  for the window/taskbar. (Windows Explorer may cache the old exe icon after a rebuild.)
 
 **Decisions settled during implementation (differ from the first-pass plan):**
 - **Single-file executable** (`--onefile`) per request, not onedir. Trade-off: slightly

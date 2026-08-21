@@ -57,9 +57,10 @@ Grab `ProjectionTestPatternGenerator.exe` from the
 
 ## Build the single-file executable
 
-**Requirements:** Windows, Python 3.10–3.12.
+**Requirements:** Python 3.10–3.12. The same `packaging/projgen.spec` builds on both
+platforms — PyInstaller cannot cross-compile, so build Windows on Windows and macOS on macOS.
 
-From the repo root:
+### Windows
 
 ```powershell
 ./packaging/build.ps1
@@ -68,19 +69,36 @@ From the repo root:
 That installs the dependencies and runs PyInstaller; the result is
 `dist/ProjectionTestPatternGenerator.exe`.
 
-Prefer to run the steps yourself:
+### macOS
 
 ```bash
-py -m pip install --user -e .
-py -m pip install --user pyinstaller
-py -m PyInstaller packaging/projgen.spec --clean --noconfirm
+bash packaging/build_mac.sh
+```
+
+This produces both `dist/ProjectionTestPatternGenerator` (single-file binary) and
+`dist/ProjectionTestPatternGenerator.app` (double-click bundle). The build targets the
+machine's own architecture (Apple Silicon or Intel). Because the app is unsigned, the first
+launch needs a right-click → **Open**, or clear the quarantine flag:
+`xattr -dr com.apple.quarantine dist/ProjectionTestPatternGenerator.app`.
+
+### Manual steps (either platform)
+
+```bash
+python -m pip install -e .
+python -m pip install pyinstaller
+python -m PyInstaller packaging/projgen.spec --clean --noconfirm
 ```
 
 The FFmpeg libraries are bundled automatically — PyAV ships them and the PyInstaller spec
 collects them, so every codec above works in the frozen app with no extra binaries.
 
-> **Tip:** to add an application icon, drop `packaging/icon.ico` before building; the spec
-> picks it up automatically.
+The app icon lives at `src/projgen/assets/` (`icon.ico` for Windows and the runtime window,
+`icon.icns` for macOS) and is used for both the executable and the application window.
+Replace those files to rebrand, then rebuild.
+
+> **Windows icon cache:** after rebuilding, Explorer may still show the previous icon from
+> its cache. Copy the exe to a new name, or clear the cache
+> (`ie4uinit.exe -show`) to force a refresh.
 
 ---
 
