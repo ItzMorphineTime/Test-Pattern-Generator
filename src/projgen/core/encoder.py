@@ -208,7 +208,7 @@ def _encode_sequence(frames: Iterable[np.ndarray], out_dir: Path, total: int,
     for i, frame_np in enumerate(frames):
         if cancel and cancel():
             break
-        Image.fromarray(frame_np, "RGB").save(out_dir / f"frame_{i:0{pad}d}.{ext}")
+        Image.fromarray(frame_np).save(out_dir / f"frame_{i:0{pad}d}.{ext}")
         if progress:
             progress(i + 1, total)
     return out_dir
