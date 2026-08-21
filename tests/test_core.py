@@ -57,7 +57,8 @@ def test_colour_loop_axis_y_varies_down_not_across():
     assert not np.array_equal(frame[0, 0, :], frame[-1, 0, :])  # differs down y
 
 
-def test_integer_speed_lines_are_seamless():
+def test_lines_final_frame_returns_to_start():
+    # With the loop toggle on, the last rendered frame matches the first.
     cfg = _tiny()
     cfg.color_loop.enabled = False
     cfg.h_lines.enabled = True
@@ -65,10 +66,10 @@ def test_integer_speed_lines_are_seamless():
     cfg.h_lines.speed = 3
     r = FrameRenderer(cfg)
     n = cfg.total_frames()
-    assert np.array_equal(r.render(0), r.render(n))
+    assert np.array_equal(r.render(0), r.render(n - 1))
 
 
-def test_lines_ping_pong_return_to_start():
+def test_lines_ping_pong_returns_to_start_and_moves_between():
     cfg = _tiny()
     cfg.color_loop.enabled = False
     cfg.h_lines.enabled = True
@@ -76,12 +77,12 @@ def test_lines_ping_pong_return_to_start():
     cfg.h_lines.speed = 1
     r = FrameRenderer(cfg)
     n = cfg.total_frames()
-    start, middle, end = r.render(0), r.render(n // 2), r.render(n)
-    assert np.array_equal(start, end)          # one whole sweep returns to start
-    assert not np.array_equal(start, middle)   # and actually moves away in between
+    start, middle, end = r.render(0), r.render(n // 2), r.render(n - 1)
+    assert np.array_equal(start, end)          # complete out-and-back
+    assert not np.array_equal(start, middle)   # actually moves away in between
 
 
-def test_seamless_rounds_fractional_speed_and_still_loops():
+def test_seamless_rounds_fractional_speed_and_still_returns():
     cfg = _tiny()
     cfg.color_loop.enabled = False
     cfg.h_lines.enabled = True
@@ -89,10 +90,10 @@ def test_seamless_rounds_fractional_speed_and_still_loops():
     cfg.h_lines.speed = 2.4  # rounds to 2 whole sweeps
     cfg.h_lines.seamless = True
     r = FrameRenderer(cfg)
-    assert np.array_equal(r.render(0), r.render(cfg.total_frames()))
+    assert np.array_equal(r.render(0), r.render(cfg.total_frames() - 1))
 
 
-def test_free_mode_uses_raw_speed_and_need_not_loop():
+def test_free_mode_scrolls_and_does_not_ping_pong():
     cfg = _tiny()
     cfg.color_loop.enabled = False
     cfg.h_lines.enabled = True
@@ -100,7 +101,11 @@ def test_free_mode_uses_raw_speed_and_need_not_loop():
     cfg.h_lines.speed = 2.4
     cfg.h_lines.seamless = False
     r = FrameRenderer(cfg)
-    assert not np.array_equal(r.render(0), r.render(cfg.total_frames()))
+    n = cfg.total_frames()
+    # continuous scroll: the last frame does not return to the start
+    assert not np.array_equal(r.render(0), r.render(n - 1))
+    # and the midpoint is not a mirror of a ping-pong (monotonic scroll)
+    assert not np.array_equal(r.render(1), r.render(n - 1))
 
 
 def test_soft_and_solid_lines_render_without_error():

@@ -20,40 +20,63 @@ def _rgb_u8(color) -> np.ndarray:
     return np.array([round(c * 255) for c in color], dtype=np.float32)
 
 
+def _draw_line(alpha: np.ndarray, coords: np.ndarray, center: float,
+               cfg: LineGroupConfig, wrap_length: int | None) -> None:
+    """Accumulate one line's coverage into ``alpha`` (in place, taking the max)."""
+    dist = np.abs(coords - center)
+    if wrap_length is not None:  # continuous scroll wraps around the edges
+        dist = np.minimum(dist, wrap_length - dist)
+    if cfg.style is LineStyle.SOFT:
+        sigma = max(cfg.thickness * 0.6, 1.0)
+        line = np.exp(-(dist / sigma) ** 2)
+    else:
+        half = max(cfg.thickness / 2.0, 0.5)
+        # 1px anti-aliased shoulder keeps thin lines from shimmering.
+        line = np.clip(half + 0.5 - dist, 0.0, 1.0)
+    np.maximum(alpha, line, out=alpha)
+
+
+def _sweep_count(cfg: LineGroupConfig) -> int:
+    """Whole number of there-and-back sweeps (round half up; 0 means static)."""
+    if cfg.speed <= 0:
+        return 0
+    return max(1, int(cfg.speed + 0.5))
+
+
 def _line_alpha_1d(length: int, cfg: LineGroupConfig, frame_index: int,
                    total_frames: int) -> np.ndarray:
     """Coverage in ``[0, 1]`` along one axis for a group of moving lines.
 
-    The lines ping-pong: one "sweep" moves them across and back to the start, so
-    a whole number of sweeps returns exactly to the starting position (seamless).
-    Lines bounce off the edges rather than wrapping around them.
+    Loop toggle **on** (``seamless``): the lines ping-pong and the clip is a
+    complete out-and-back — frame 0 and the final frame both sit at the start
+    position (a whole number of sweeps over the ``N - 1`` frame span). Lines
+    bounce off the edges rather than wrapping.
+
+    Loop toggle **off**: the lines scroll continuously in one direction at the
+    exact ``speed`` (wrapping around the edges); the motion does not return.
     """
     coords = np.arange(length, dtype=np.float32)
-    # A whole number of sweeps per loop guarantees the there-and-back motion
-    # returns to its start on the wrap frame; free mode uses the raw speed.
-    sweeps = round(cfg.speed) if cfg.seamless else cfg.speed
-    t = frame_index / max(1, total_frames)
-    phase = sweeps * t
-    if cfg.direction < 0:
-        phase += 0.5  # start from the opposite side
-    # Triangle wave in [0, 1]: 0 -> 1 -> 0 over each sweep (there and back).
-    tri = 1.0 - abs(1.0 - 2.0 * (phase % 1.0))
-
     count = max(1, cfg.count)
     span = 1.0 / count
-    max_index = max(1, length - 1)
     alpha = np.zeros(length, dtype=np.float32)
-    for k in range(count):
-        center = (k * span + span * tri) * max_index
-        dist = np.abs(coords - center)  # non-wrapping: bounce at the edges
-        if cfg.style is LineStyle.SOFT:
-            sigma = max(cfg.thickness * 0.6, 1.0)
-            line = np.exp(-(dist / sigma) ** 2)
-        else:
-            half = max(cfg.thickness / 2.0, 0.5)
-            # 1px anti-aliased shoulder keeps thin lines from shimmering.
-            line = np.clip(half + 0.5 - dist, 0.0, 1.0)
-        alpha = np.maximum(alpha, line)
+
+    if cfg.seamless:
+        sweeps = _sweep_count(cfg)
+        denom = max(1, total_frames - 1)  # so the final frame returns to start
+        phase = (frame_index / denom) * sweeps
+        if cfg.direction < 0:
+            phase += 0.5  # start from the opposite side
+        # Triangle wave 0 -> 1 -> 0 over each sweep (there and back).
+        tri = 1.0 - abs(1.0 - 2.0 * (phase % 1.0)) if sweeps else 0.0
+        max_index = max(1, length - 1)
+        for k in range(count):
+            center = (k * span + span * tri) * max_index
+            _draw_line(alpha, coords, center, cfg, wrap_length=None)
+    else:
+        travel = (frame_index * cfg.speed * cfg.direction) / max(1, total_frames)
+        for k in range(count):
+            center = ((k * span + travel) % 1.0) * length
+            _draw_line(alpha, coords, center, cfg, wrap_length=length)
 
     return np.clip(alpha * cfg.opacity, 0.0, 1.0)
 
