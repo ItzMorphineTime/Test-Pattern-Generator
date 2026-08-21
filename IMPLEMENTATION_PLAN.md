@@ -6,6 +6,30 @@ horizontal/vertical tracking lines and number grids.
 
 ---
 
+## 0. Build status (living)
+
+| Milestone | Status |
+|---|---|
+| M1 — Core render parity (config, colour loop, seamless loop) | ✅ done |
+| M2 — Export formats (7 presets via PyAV) | ✅ done |
+| M3 — Overlays (tracking lines + number grid) | ✅ done |
+| M4 — PySide6 GUI (live preview, threaded export, presets) | ✅ done |
+| M5 — Packaging (single-file PyInstaller exe) + README | ✅ done |
+
+**Decisions settled during implementation (differ from the first-pass plan):**
+- **Single-file executable** (`--onefile`) per request, not onedir. Trade-off: slightly
+  slower first launch (self-extract) for one portable `.exe`.
+- **AV1 uses `libsvtav1`** (fast, present in the PyAV FFmpeg build); `libaom-av1` is not
+  compiled in.
+- **No vendored TTF.** Pillow 11's scalable `ImageFont.load_default(size=)` supplies the
+  grid font, so there is no `assets/fonts/` folder and no font-licensing question. A system
+  font family can still be passed as an override.
+- **FFmpeg is not a separate bundled binary** — PyAV already ships the FFmpeg shared
+  libraries, and PyInstaller collects them, so codecs work in the frozen app out of the box.
+- Package lives under `src/projgen/`; packaging assets under `packaging/`.
+
+---
+
 ## 1. Analysis of the existing Blender script
 
 `BlenderSimpleProjectionColourLoop.py` is a Blender 5.x add-on that:
@@ -166,7 +190,7 @@ format, quality)`:
 | H.264 MP4 (web/default) | mp4 | libx264 | yuv420p | CRF |
 | H.265 MP4 (smaller) | mp4 | libx265 | yuv420p | CRF |
 | VP9 WebM | webm | libvpx-vp9 | yuv420p | CRF |
-| AV1 MP4/MKV | mp4/mkv | libaom-av1/svt-av1 | yuv420p | CRF |
+| AV1 MP4 | mp4 | libsvtav1 | yuv420p | CRF |
 | ProRes MOV (edit) | mov | prores_ks | yuv422p10 | profile |
 | Lossless FFV1 MKV | mkv | ffv1 | rgb/yuv | lossless |
 | Image sequence | — | PNG/TIFF | rgb(a) | lossless |
@@ -255,16 +279,16 @@ def asset_path(*parts):
 
 ## 9. Milestones
 
-1. **M1 — Core parity (no UI):** `config`, `color`, `pattern` (colour loop), `loop`,
-   `render`, `encoder` with H.264 MP4. CLI renders a clip matching the current script's
-   look. Seamlessness + golden tests green.
-2. **M2 — Formats:** all export presets, even-dim + fractional-fps handling, image
-   sequence output.
-3. **M3 — Overlays:** tracking lines (H/V) and number grid, with seamless line motion.
-4. **M4 — GUI:** PySide6 window, live preview + scrub, threaded export with progress/cancel,
-   preset save/load.
-5. **M5 — Packaging:** PyInstaller onedir build, bundled ffmpeg + font, CI exe smoke test,
-   optional installer.
+1. ✅ **M1 — Core parity (no UI):** `config`, `color`, `pattern` (colour loop), `loop`,
+   `render`. CLI renders a clip matching the current script's look. Seamlessness tests green.
+2. ✅ **M2 — Formats:** `encoder` with all seven export presets, even-dim + fractional/NTSC
+   fps handling, image-sequence output, CRF/bitrate overrides.
+3. ✅ **M3 — Overlays:** tracking lines (H/V) and number grid, with seamless line motion.
+4. ✅ **M4 — GUI:** PySide6 window, live preview + scrub, threaded export with
+   progress/cancel, preset save/load.
+5. ✅ **M5 — Packaging:** single-file PyInstaller exe (FFmpeg libs collected from PyAV);
+   README with build instructions. *Optional follow-ups: code-signing, Inno Setup installer,
+   GitHub Actions CI to build + smoke-test the exe.*
 
 ## 10. Risks / decisions to confirm
 - **PyAV vs bundled-ffmpeg-pipe**: PyAV is cleaner but codec availability depends on the
