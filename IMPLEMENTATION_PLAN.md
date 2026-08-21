@@ -20,10 +20,11 @@ horizontal/vertical tracking lines and number grids.
 **M6 refinements (from first hands-on review):**
 - **Resizable control panel** — the left sidebar is now a splitter pane (min width, not
   fixed) and the panel reserves right-hand margin so the scrollbar no longer overlaps fields.
-- **Ping-pong line motion + seamless toggle** — lines sweep across *and back* (they bounce
-  off the edges instead of wrapping/teleporting), so a whole sweep returns to the start.
-  Each group has a *Loop seamlessly* option (default on: whole there-and-back sweeps → the
-  lines return to their start at the loop point; off: exact/fractional `speed`, free motion).
+- **Line motion gated on the loop toggle** — *Loop seamlessly* **on**: the lines ping-pong
+  and the clip is a complete out-and-back, with the final rendered frame landing back on the
+  start position (sweeps mapped across the `N-1` frame span). *Off*: the lines scroll
+  continuously in one direction (wrapping at the edges) at the exact `speed` and do not
+  return. `speed` is a float; in loop mode it rounds to whole there-and-back sweeps.
 - **Spin-box step buttons** styled with explicit geometry so they sit flush at the field's
   right edge and stay clickable (previously overlapped the text).
 - **Windows small/details icon** — icon `.ico` small sizes are stored as BMP/DIB (not PNG),
