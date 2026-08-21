@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "projgen"
+version = "0.1.0"
+description = "Seamless projection-mapping test-pattern generator and video exporter"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Joseph Loe" }]
+dependencies = [
+    "numpy>=1.24",
+    "Pillow>=10.0",
+    "av>=11.0",
+    "imageio-ffmpeg>=0.4.9",
+    "PySide6>=6.6",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4", "pyinstaller>=6.0", "ruff>=0.4"]
+
+[project.gui-scripts]
+projgen = "projgen.__main__:main"
+
+[project.scripts]
+projgen-cli = "projgen.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+projgen = ["assets/fonts/*.ttf"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
