@@ -190,12 +190,15 @@ class MainWindow(QMainWindow):
         count = int_spin(1, 200, cfg.count)
         thickness = int_spin(1, 400, cfg.thickness, 1, " px")
         speed = float_spin(0.0, 200.0, cfg.speed, 0.5, 2)
-        speed.setToolTip("How many times the lines sweep across during one loop.")
+        speed.setToolTip(
+            "Sweeps per loop. Each sweep moves the lines across and back to the "
+            "start (there and back).")
         seamless = QCheckBox("Loop seamlessly (whole sweeps)")
         seamless.setChecked(cfg.seamless)
         seamless.setToolTip(
-            "On: the sweep count is rounded to a whole number so the motion loops "
-            "perfectly with the video.\nOff: uses the exact speed (free motion).")
+            "On: the sweep count is rounded to a whole number so the lines return "
+            "to their start position at the loop point.\n"
+            "Off: uses the exact speed (free motion that need not return).")
         opacity = float_spin(0.0, 1.0, cfg.opacity, 0.05)
         style = QComboBox()
         style.addItem("Solid", LineStyle.SOLID)

@@ -68,6 +68,19 @@ def test_integer_speed_lines_are_seamless():
     assert np.array_equal(r.render(0), r.render(n))
 
 
+def test_lines_ping_pong_return_to_start():
+    cfg = _tiny()
+    cfg.color_loop.enabled = False
+    cfg.h_lines.enabled = True
+    cfg.h_lines.count = 1
+    cfg.h_lines.speed = 1
+    r = FrameRenderer(cfg)
+    n = cfg.total_frames()
+    start, middle, end = r.render(0), r.render(n // 2), r.render(n)
+    assert np.array_equal(start, end)          # one whole sweep returns to start
+    assert not np.array_equal(start, middle)   # and actually moves away in between
+
+
 def test_seamless_rounds_fractional_speed_and_still_loops():
     cfg = _tiny()
     cfg.color_loop.enabled = False

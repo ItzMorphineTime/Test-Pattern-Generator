@@ -20,26 +20,32 @@ def _rgb_u8(color) -> np.ndarray:
     return np.array([round(c * 255) for c in color], dtype=np.float32)
 
 
-def _circular_distance(coords: np.ndarray, center: float, length: int) -> np.ndarray:
-    """Shortest distance on a ring of circumference ``length`` (edge-wrapping)."""
-    d = np.abs(coords - center)
-    return np.minimum(d, length - d)
-
-
 def _line_alpha_1d(length: int, cfg: LineGroupConfig, frame_index: int,
                    total_frames: int) -> np.ndarray:
-    """Coverage in ``[0, 1]`` along one axis for a group of moving lines."""
+    """Coverage in ``[0, 1]`` along one axis for a group of moving lines.
+
+    The lines ping-pong: one "sweep" moves them across and back to the start, so
+    a whole number of sweeps returns exactly to the starting position (seamless).
+    Lines bounce off the edges rather than wrapping around them.
+    """
     coords = np.arange(length, dtype=np.float32)
-    # A whole number of sweeps per loop guarantees the motion returns to its
-    # start on the wrap frame; free mode uses the raw speed.
+    # A whole number of sweeps per loop guarantees the there-and-back motion
+    # returns to its start on the wrap frame; free mode uses the raw speed.
     sweeps = round(cfg.speed) if cfg.seamless else cfg.speed
-    travel = (frame_index * sweeps * cfg.direction) / max(1, total_frames)
-    alpha = np.zeros(length, dtype=np.float32)
+    t = frame_index / max(1, total_frames)
+    phase = sweeps * t
+    if cfg.direction < 0:
+        phase += 0.5  # start from the opposite side
+    # Triangle wave in [0, 1]: 0 -> 1 -> 0 over each sweep (there and back).
+    tri = 1.0 - abs(1.0 - 2.0 * (phase % 1.0))
 
     count = max(1, cfg.count)
+    span = 1.0 / count
+    max_index = max(1, length - 1)
+    alpha = np.zeros(length, dtype=np.float32)
     for k in range(count):
-        center = ((k / count + travel) % 1.0) * length
-        dist = _circular_distance(coords, center, length)
+        center = (k * span + span * tri) * max_index
+        dist = np.abs(coords - center)  # non-wrapping: bounce at the edges
         if cfg.style is LineStyle.SOFT:
             sigma = max(cfg.thickness * 0.6, 1.0)
             line = np.exp(-(dist / sigma) ** 2)

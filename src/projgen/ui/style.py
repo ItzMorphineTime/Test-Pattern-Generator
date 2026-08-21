@@ -30,6 +30,9 @@ QSpinBox, QDoubleSpinBox, QComboBox, QLineEdit {
     min-height: 22px;
     selection-background-color: #4c8bf5;
 }
+/* Reserve room on the right so the text never slides under the step buttons. */
+QSpinBox, QDoubleSpinBox { padding-right: 20px; }
+
 QComboBox::drop-down { border: 0; width: 18px; }
 QComboBox QAbstractItemView {
     background-color: #262b33;
@@ -38,6 +41,41 @@ QComboBox QAbstractItemView {
 }
 QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus, QLineEdit:focus {
     border: 1px solid #4c8bf5;
+}
+
+/* Explicit geometry for the up/down step buttons so they sit flush at the
+   right edge, don't overlap the field, and stay clickable. */
+QSpinBox::up-button, QDoubleSpinBox::up-button {
+    subcontrol-origin: border;
+    subcontrol-position: top right;
+    width: 18px;
+    border-left: 1px solid #3a4150;
+    border-top-right-radius: 5px;
+    background-color: #2d333d;
+}
+QSpinBox::down-button, QDoubleSpinBox::down-button {
+    subcontrol-origin: border;
+    subcontrol-position: bottom right;
+    width: 18px;
+    border-left: 1px solid #3a4150;
+    border-bottom-right-radius: 5px;
+    background-color: #2d333d;
+}
+QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
+QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {
+    background-color: #3a4150;
+}
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
+    width: 0; height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-bottom: 5px solid #9aa7b8;
+}
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
+    width: 0; height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid #9aa7b8;
 }
 
 QPushButton {
