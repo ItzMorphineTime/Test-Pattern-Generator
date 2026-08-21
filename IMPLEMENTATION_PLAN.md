@@ -20,9 +20,15 @@ horizontal/vertical tracking lines and number grids.
 **M6 refinements (from first hands-on review):**
 - **Resizable control panel** — the left sidebar is now a splitter pane (min width, not
   fixed) and the panel reserves right-hand margin so the scrollbar no longer overlaps fields.
-- **Seamless-loop toggle for lines** — each line group has a *Loop seamlessly* option
-  (default on: whole sweeps per loop → perfect loop; off: exact/fractional speed, free
-  motion). `speed` is now a float.
+- **Ping-pong line motion + seamless toggle** — lines sweep across *and back* (they bounce
+  off the edges instead of wrapping/teleporting), so a whole sweep returns to the start.
+  Each group has a *Loop seamlessly* option (default on: whole there-and-back sweeps → the
+  lines return to their start at the loop point; off: exact/fractional `speed`, free motion).
+- **Spin-box step buttons** styled with explicit geometry so they sit flush at the field's
+  right edge and stay clickable (previously overlapped the text).
+- **Windows small/details icon** — icon `.ico` small sizes are stored as BMP/DIB (not PNG),
+  which Windows Explorer's small and details views require, so they no longer fall back to
+  the default icon.
 - **Cross-platform builds** — one spec builds Windows (`.exe`) and macOS (single-file
   binary **and** `.app` bundle) with the right icon per platform (`.ico` / `.icns`).
   Built via `packaging/build.ps1` (Windows) or `packaging/build_mac.sh` (macOS).
