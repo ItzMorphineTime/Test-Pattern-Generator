@@ -386,6 +386,14 @@ class MainWindow(QMainWindow):
         scale = min(1.0, PREVIEW_MAX / max(w, h))
         cfg.output.width = max(2, int(round(w * scale)) // 2 * 2)
         cfg.output.height = max(2, int(round(h * scale)) // 2 * 2)
+        if scale < 1.0:
+            # Scale pixel-based sizes with the canvas so the preview is a
+            # faithful miniature of the final render.
+            if cfg.grid.font_size:
+                cfg.grid.font_size = max(1, round(cfg.grid.font_size * scale))
+            cfg.grid.line_thickness = max(1, round(cfg.grid.line_thickness * scale))
+            for group in (cfg.h_lines, cfg.v_lines):
+                group.thickness = max(1, round(group.thickness * scale))
         return cfg
 
     # ------------------------------------------------------------------
