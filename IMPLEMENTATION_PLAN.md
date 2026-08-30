@@ -37,9 +37,13 @@ horizontal/vertical tracking lines and number grids.
   configured position; x and y run different whole cycle counts so the path criss-crosses).
   Effects run whole cycles across the `N-1` frame span, so the final frame returns to the
   start (same convention as the lines). Exposed in the GUI group *Image / Logo* and via
-  `--image*` CLI flags; missing files fail validation. Choosing an animated effect
-  auto-starts preview playback — effects rest at their start state on frame 0, so a paused
-  preview would otherwise show nothing changing.
+  `--image*` CLI flags; missing files fail validation.
+- **Qt enum flattening fix** — PySide6's QVariant flattens str-mixin enum members to plain
+  strings when stored as combo-box data, which silently broke every enum-driven setting set
+  from the GUI (image effects rendered static, the colour-loop axis stuck on vertical, soft
+  line style fell back to solid, grid label modes stuck on alpha-numeric). Fixed centrally:
+  `_set` coerces values back to the field's enum type, and the render core compares enums
+  with `==` so plain-string configs also work. Locked in by a string-tolerance test.
 - **Faithful preview scaling** — pixel-based sizes (fixed grid font size, grid/tracking
   line thicknesses) are scaled by the preview's downscale factor, so the preview matches
   the final render proportionally.

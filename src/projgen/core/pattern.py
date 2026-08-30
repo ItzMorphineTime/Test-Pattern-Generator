@@ -28,7 +28,7 @@ def colour_loop_frame(
     """
     p = phase(frame_index, total_frames)
 
-    if cfg.axis is Axis.X:
+    if cfg.axis == Axis.X:
         coord = np.linspace(0.0, 1.0, width, endpoint=False, dtype=np.float32)
     else:
         coord = np.linspace(0.0, 1.0, height, endpoint=False, dtype=np.float32)
@@ -40,7 +40,7 @@ def colour_loop_frame(
     line_hsv[:, 2] = cfg.value
     line_rgb = to_u8(hsv_to_rgb(line_hsv))  # (len, 3)
 
-    if cfg.axis is Axis.X:
+    if cfg.axis == Axis.X:
         frame = np.broadcast_to(line_rgb[np.newaxis, :, :], (height, width, 3))
     else:
         frame = np.broadcast_to(line_rgb[:, np.newaxis, :], (height, width, 3))

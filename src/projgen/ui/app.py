@@ -6,6 +6,7 @@ import copy
 import os
 import subprocess
 import sys
+from enum import Enum
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThread, QTimer
@@ -55,7 +56,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Projection Test-Pattern Generator")
         if icon_path():
             self.setWindowIcon(QIcon(icon_path()))
-        self.resize(1180, 760)
+        self.resize(1460, 820)
         self.config = ProjectConfig()
         self._worker: RenderWorker | None = None
         self._thread: QThread | None = None
@@ -66,7 +67,7 @@ class MainWindow(QMainWindow):
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
         self._scroll.setWidget(controls)
-        self._scroll.setMinimumWidth(320)
+        self._scroll.setMinimumWidth(420)
         self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
@@ -84,7 +85,7 @@ class MainWindow(QMainWindow):
         splitter.setStretchFactor(1, 1)
         splitter.setCollapsible(0, False)
         splitter.setChildrenCollapsible(False)
-        splitter.setSizes([440, 740])
+        splitter.setSizes([660, 800])
         self.setCentralWidget(splitter)
         self.statusBar().showMessage("Ready")
 
@@ -434,18 +435,19 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
     def _set(self, dotted: str, value, refresh: bool = True) -> None:
         section, attr = dotted.split(".")
-        setattr(getattr(self.config, section), attr, value)
+        target = getattr(self.config, section)
+        current = getattr(target, attr)
+        # Qt's QVariant flattens str-mixin enum members to plain strings on the
+        # way through a combo box; restore the enum type so the render core's
+        # comparisons keep working.
+        if isinstance(current, Enum) and not isinstance(value, Enum):
+            value = type(current)(value)
+        setattr(target, attr, value)
         if dotted in ("color_loop.enabled", "h_lines.enabled",
                       "v_lines.enabled", "grid.enabled"):
             self._sync_enabled_states()
         if refresh:
             self._refresh_timer.start(120)
-        # Demo animated image effects immediately: a paused preview at frame 0
-        # shows nothing, because effects start and end at their rest state.
-        if ((dotted == "image.effect" and value is not ImageEffect.NONE)
-                or (dotted == "image.enabled" and value
-                    and self.config.image.effect is not ImageEffect.NONE)):
-            self.preview.play()
 
     def _sync_enabled_states(self) -> None:
         # Checkable group boxes grey out their children automatically; nothing

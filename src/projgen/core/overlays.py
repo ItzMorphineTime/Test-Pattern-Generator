@@ -37,7 +37,7 @@ def _draw_line(alpha: np.ndarray, coords: np.ndarray, center: float,
     dist = np.abs(coords - center)
     if wrap_length is not None:  # continuous scroll wraps around the edges
         dist = np.minimum(dist, wrap_length - dist)
-    if cfg.style is LineStyle.SOFT:
+    if cfg.style == LineStyle.SOFT:
         sigma = max(cfg.thickness * 0.6, 1.0)
         line = np.exp(-(dist / sigma) ** 2)
     else:
@@ -144,11 +144,11 @@ def _column_letters(index: int) -> str:
 
 def cell_label(mode: LabelMode, row: int, col: int, cols: int,
                cell_w: float, cell_h: float) -> str:
-    if mode is LabelMode.SEQUENTIAL:
+    if mode == LabelMode.SEQUENTIAL:
         return str(row * cols + col)
-    if mode is LabelMode.ROW_COL:
+    if mode == LabelMode.ROW_COL:
         return f"R{row + 1}C{col + 1}"
-    if mode is LabelMode.COORDS:
+    if mode == LabelMode.COORDS:
         return f"{int(col * cell_w)},{int(row * cell_h)}"
     return f"{_column_letters(col)}{row + 1}"  # ALPHA_NUM
 
@@ -247,18 +247,18 @@ class ImageOverlay:
         return (frame_index / span) * cycles
 
     def _size_factor(self, phase: float) -> float:
-        if self.cfg.effect is ImageEffect.PULSE:
+        if self.cfg.effect == ImageEffect.PULSE:
             return max(0.05, 1.0 + self.cfg.effect_amount * math.sin(2 * math.pi * phase))
         return 1.0
 
     def _alpha_factor(self, phase: float) -> float:
-        if self.cfg.effect is ImageEffect.FADE:
+        if self.cfg.effect == ImageEffect.FADE:
             dip = 0.5 - 0.5 * math.cos(2 * math.pi * phase)
             return 1.0 - min(1.0, self.cfg.effect_amount) * dip
         return 1.0
 
     def _angle(self, phase: float) -> float:
-        if self.cfg.effect is ImageEffect.SPIN:
+        if self.cfg.effect == ImageEffect.SPIN:
             return -360.0 * phase
         return 0.0
 
@@ -295,11 +295,11 @@ class ImageOverlay:
         """The ``(H, W, 4)`` uint8 layer for this frame, or None if unloaded."""
         if self._source is None:
             return None
-        if self.cfg.effect is ImageEffect.NONE:
+        if self.cfg.effect == ImageEffect.NONE:
             if self._static_layer is None:
                 self._static_layer = self._render(1.0, 1.0, 0.0)
             return self._static_layer
-        if self.cfg.effect is ImageEffect.BOUNCE:
+        if self.cfg.effect == ImageEffect.BOUNCE:
             t = frame_index / max(1, total_frames - 1)
             return self._render(1.0, 1.0, 0.0, pos=self._bounce_pos(t))
         phase = self._phase(frame_index, total_frames)

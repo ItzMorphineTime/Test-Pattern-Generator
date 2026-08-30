@@ -227,6 +227,43 @@ def test_missing_image_render_is_graceful(tmp_path):
     FrameRenderer(cfg).render(0)  # must not raise
 
 
+# --- string-valued enum tolerance (Qt flattens str enums to plain str) -----
+def test_core_accepts_plain_string_enum_values(tmp_path):
+    # axis as plain "y": gradient must run down the Y axis
+    cfg = _tiny()
+    cfg.color_loop.axis = "y"
+    frame = FrameRenderer(cfg).render(3)
+    assert np.array_equal(frame[:, 0, :], frame[:, -1, :])
+    assert not np.array_equal(frame[0, 0, :], frame[-1, 0, :])
+
+    # axis as plain "x": gradient must run across the X axis
+    cfg.color_loop.axis = "x"
+    frame = FrameRenderer(cfg).render(3)
+    assert np.array_equal(frame[0, :, :], frame[-1, :, :])
+    assert not np.array_equal(frame[0, 0, :], frame[0, -1, :])
+
+    # image effect as plain "pulse": must actually animate
+    cfg2 = _image_cfg(tmp_path, effect_amount=0.5)
+    cfg2.image.effect = "pulse"
+    r = FrameRenderer(cfg2)
+    n = cfg2.total_frames()
+    assert not np.array_equal(r.render(0), r.render(n // 2))
+
+    # line style as plain "soft": must differ from solid
+    solid, soft = [], []
+    for style, out in (("solid", solid), ("soft", soft)):
+        c = _tiny()
+        c.color_loop.enabled = False
+        c.h_lines.enabled = True
+        c.h_lines.thickness = 6
+        c.h_lines.style = style
+        out.append(FrameRenderer(c).render(2))
+    assert not np.array_equal(solid[0], soft[0])
+
+    # label mode as plain "row_col"
+    assert overlays.cell_label("row_col", 0, 0, 4, 10.0, 10.0) == "R1C1"
+
+
 # --- config ---------------------------------------------------------------
 def test_config_json_roundtrip_preserves_enums_and_tuples():
     cfg = _tiny()

@@ -89,11 +89,6 @@ class PreviewWidget(QWidget):
         else:
             self._timer.stop()
 
-    def play(self) -> None:
-        """Start playback if not already running (used to demo animated effects)."""
-        if not self._playing:
-            self.toggle_play()
-
     # -- internals -------------------------------------------------------
     def _advance(self) -> None:
         if self._total <= 1:
