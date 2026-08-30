@@ -51,13 +51,17 @@ class FrameRenderer:
         if cfg.v_lines.enabled:
             frame = overlays.apply_lines(frame, cfg.v_lines, frame_index, n, "v")
 
+        image_layer = None
         if self._image_overlay is not None:
-            layer = self._image_overlay.layer(frame_index, n)
-            if layer is not None:
-                frame = overlays.composite_rgba(frame, layer)
+            image_layer = self._image_overlay.layer(frame_index, n)
+        if image_layer is not None and not cfg.image.above_grid:
+            frame = overlays.composite_rgba(frame, image_layer)
 
         if self._grid_overlay is not None:
             frame = overlays.composite_rgba(frame, self._grid_overlay)
+
+        if image_layer is not None and cfg.image.above_grid:
+            frame = overlays.composite_rgba(frame, image_layer)
         return frame
 
     def iter_frames(self) -> Iterator[np.ndarray]:

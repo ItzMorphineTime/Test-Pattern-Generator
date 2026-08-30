@@ -335,14 +335,20 @@ class MainWindow(QMainWindow):
         for eff, text in ((ImageEffect.NONE, "None (static)"),
                           (ImageEffect.PULSE, "Grow && Shrink"),
                           (ImageEffect.FADE, "Fade"),
-                          (ImageEffect.SPIN, "Spin")):
+                          (ImageEffect.SPIN, "Spin"),
+                          (ImageEffect.BOUNCE, "Bounce (screensaver)")):
             effect.addItem(text, eff)
         effect.setCurrentIndex(effect.findData(img.effect))
+        layer = QComboBox()
+        layer.addItem("Behind grid", False)
+        layer.addItem("On top of grid", True)
+        layer.setCurrentIndex(1 if img.above_grid else 0)
         cycles = int_spin(1, 100, img.effect_cycles)
         cycles.setToolTip("Whole effect cycles per loop, so the final frame "
                           "returns to the start.")
         amount = float_spin(0.0, 1.0, img.effect_amount, 0.05)
-        amount.setToolTip("Effect strength (size change, fade depth).")
+        amount.setToolTip("Effect strength (size change, fade depth); "
+                          "not used by Bounce.")
 
         pos_x.valueChanged.connect(lambda v: self._set("image.pos_x", v / 100.0))
         pos_y.valueChanged.connect(lambda v: self._set("image.pos_y", v / 100.0))
@@ -350,6 +356,8 @@ class MainWindow(QMainWindow):
         opacity.valueChanged.connect(lambda v: self._set("image.opacity", v))
         effect.currentIndexChanged.connect(
             lambda: self._set("image.effect", effect.currentData()))
+        layer.currentIndexChanged.connect(
+            lambda: self._set("image.above_grid", layer.currentData()))
         cycles.valueChanged.connect(lambda v: self._set("image.effect_cycles", v))
         amount.valueChanged.connect(lambda v: self._set("image.effect_amount", v))
 
@@ -365,6 +373,7 @@ class MainWindow(QMainWindow):
         form.addRow("Position", pos_wrap)
         form.addRow("Scale", scale)
         form.addRow("Opacity", opacity)
+        form.addRow("Layer", layer)
         form.addRow("Effect", effect)
         form.addRow("Effect cycles", cycles)
         form.addRow("Effect amount", amount)
@@ -431,6 +440,12 @@ class MainWindow(QMainWindow):
             self._sync_enabled_states()
         if refresh:
             self._refresh_timer.start(120)
+        # Demo animated image effects immediately: a paused preview at frame 0
+        # shows nothing, because effects start and end at their rest state.
+        if ((dotted == "image.effect" and value is not ImageEffect.NONE)
+                or (dotted == "image.enabled" and value
+                    and self.config.image.effect is not ImageEffect.NONE)):
+            self.preview.play()
 
     def _sync_enabled_states(self) -> None:
         # Checkable group boxes grey out their children automatically; nothing

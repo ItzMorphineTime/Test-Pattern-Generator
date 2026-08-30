@@ -30,11 +30,16 @@ horizontal/vertical tracking lines and number grids.
 - **Windows small/details icon** — icon `.ico` small sizes are stored as BMP/DIB (not PNG),
   which Windows Explorer's small and details views require, so they no longer fall back to
   the default icon.
-- **Image / logo overlay** — a custom picture composited between the lines and the grid,
-  with centre position (%), scale (% of canvas width), opacity, and optional effects:
-  grow & shrink (pulse), fade, spin. Effects run whole cycles across the `N-1` frame span,
-  so the final frame returns to the start (same convention as the lines). Exposed in the
-  GUI group *Image / Logo* and via `--image*` CLI flags; missing files fail validation.
+- **Image / logo overlay** — a custom picture composited onto the pattern, with centre
+  position (%), scale (% of canvas width), opacity, a grid-layer control (behind or on top
+  of the number grid), and optional effects: grow & shrink (pulse), fade, spin, and bounce
+  (screensaver-style diagonal drift that reflects off the edges, starting from the
+  configured position; x and y run different whole cycle counts so the path criss-crosses).
+  Effects run whole cycles across the `N-1` frame span, so the final frame returns to the
+  start (same convention as the lines). Exposed in the GUI group *Image / Logo* and via
+  `--image*` CLI flags; missing files fail validation. Choosing an animated effect
+  auto-starts preview playback — effects rest at their start state on frame 0, so a paused
+  preview would otherwise show nothing changing.
 - **Faithful preview scaling** — pixel-based sizes (fixed grid font size, grid/tracking
   line thicknesses) are scaled by the preview's downscale factor, so the preview matches
   the final render proportionally.

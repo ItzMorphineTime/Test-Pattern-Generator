@@ -79,6 +79,8 @@ def build_parser() -> argparse.ArgumentParser:
     im.add_argument("--image-effect", choices=[e.value for e in ImageEffect])
     im.add_argument("--image-cycles", type=int, help="Whole effect cycles per loop.")
     im.add_argument("--image-amount", type=float, help="Effect strength, 0-1.")
+    im.add_argument("--image-above-grid", action="store_true",
+                    help="Composite the image on top of the number grid.")
 
     gr = p.add_argument_group("number grid")
     gr.add_argument("--grid", type=_parse_grid, metavar="ROWSxCOLS",
@@ -146,6 +148,8 @@ def config_from_args(args: argparse.Namespace) -> ProjectConfig:
         img.effect_cycles = args.image_cycles
     if args.image_amount is not None:
         img.effect_amount = args.image_amount
+    if args.image_above_grid:
+        img.above_grid = True
 
     g = cfg.grid
     if args.grid is not None:

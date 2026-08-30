@@ -35,9 +35,10 @@ class LabelMode(str, Enum):
 
 class ImageEffect(str, Enum):
     NONE = "none"
-    PULSE = "pulse"  # grow & shrink
-    FADE = "fade"    # opacity breathe
-    SPIN = "spin"    # rotate
+    PULSE = "pulse"    # grow & shrink
+    FADE = "fade"      # opacity breathe
+    SPIN = "spin"      # rotate
+    BOUNCE = "bounce"  # diagonal drift, bouncing off the edges (screensaver style)
 
 
 RGB = tuple[float, float, float]
@@ -114,6 +115,7 @@ class ImageConfig:
     effect: ImageEffect = ImageEffect.NONE
     effect_cycles: int = 1     # whole cycles per loop -> returns to start
     effect_amount: float = 0.3  # effect strength, 0..1
+    above_grid: bool = False   # composite on top of the number grid
 
 
 @dataclass

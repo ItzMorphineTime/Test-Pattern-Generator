@@ -262,6 +262,34 @@ class ImageOverlay:
             return -360.0 * phase
         return 0.0
 
+    @staticmethod
+    def _axis_bounce(t: float, cycles: int, extent: float, start: float) -> float:
+        """Triangle-wave position along one axis, bouncing between the edges.
+
+        ``extent`` is the image's size as a fraction of the axis; the centre
+        travels within ``[extent/2, 1 - extent/2]``. The phase offset makes the
+        motion start from the configured position, and whole ``cycles`` return
+        it there on the final frame.
+        """
+        lo, hi = extent / 2.0, 1.0 - extent / 2.0
+        if hi <= lo:  # image fills the axis; nowhere to travel
+            return 0.5
+        u0 = min(1.0, max(0.0, (start - lo) / (hi - lo)))
+        phase = cycles * t + u0 / 2.0
+        tri = 1.0 - abs(1.0 - 2.0 * (phase % 1.0))
+        return lo + (hi - lo) * tri
+
+    def _bounce_pos(self, t: float) -> tuple[float, float]:
+        cfg = self.cfg
+        src = self._source
+        sw = min(1.0, max(0.0, cfg.scale))
+        sh = min(1.0, sw * (src.height / src.width) * (self.width / self.height))
+        cycles = max(1, int(cfg.effect_cycles))
+        # Different whole cycle counts per axis criss-cross the path diagonally
+        # (screensaver style) while both still return to the start.
+        return (self._axis_bounce(t, cycles, sw, cfg.pos_x),
+                self._axis_bounce(t, cycles + 1, sh, cfg.pos_y))
+
     # -- rendering -------------------------------------------------------
     def layer(self, frame_index: int, total_frames: int) -> np.ndarray | None:
         """The ``(H, W, 4)`` uint8 layer for this frame, or None if unloaded."""
@@ -271,14 +299,18 @@ class ImageOverlay:
             if self._static_layer is None:
                 self._static_layer = self._render(1.0, 1.0, 0.0)
             return self._static_layer
+        if self.cfg.effect is ImageEffect.BOUNCE:
+            t = frame_index / max(1, total_frames - 1)
+            return self._render(1.0, 1.0, 0.0, pos=self._bounce_pos(t))
         phase = self._phase(frame_index, total_frames)
         return self._render(self._size_factor(phase), self._alpha_factor(phase),
                             self._angle(phase))
 
-    def _render(self, size_factor: float, alpha_factor: float,
-                angle: float) -> np.ndarray:
+    def _render(self, size_factor: float, alpha_factor: float, angle: float,
+                pos: tuple[float, float] | None = None) -> np.ndarray:
         cfg = self.cfg
         src = self._source
+        pos_x, pos_y = pos if pos is not None else (cfg.pos_x, cfg.pos_y)
         target_w = max(1, round(self.width * cfg.scale * size_factor))
         target_h = max(1, round(target_w * src.height / src.width))
         img = src.resize((target_w, target_h), Image.LANCZOS)
@@ -286,8 +318,8 @@ class ImageOverlay:
             img = img.rotate(angle, expand=True, resample=Image.BICUBIC)
 
         canvas = Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
-        left = round(cfg.pos_x * self.width - img.width / 2)
-        top = round(cfg.pos_y * self.height - img.height / 2)
+        left = round(pos_x * self.width - img.width / 2)
+        top = round(pos_y * self.height - img.height / 2)
         canvas.paste(img, (left, top), img)
 
         layer = np.asarray(canvas).copy()

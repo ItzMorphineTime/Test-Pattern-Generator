@@ -172,7 +172,8 @@ def test_static_image_is_composited(tmp_path):
 def test_image_effects_return_to_start_and_animate(tmp_path):
     from projgen.core.config import ImageEffect
 
-    for effect in (ImageEffect.PULSE, ImageEffect.FADE, ImageEffect.SPIN):
+    for effect in (ImageEffect.PULSE, ImageEffect.FADE, ImageEffect.SPIN,
+                   ImageEffect.BOUNCE):
         cfg = _image_cfg(tmp_path, effect=effect, effect_cycles=1,
                          effect_amount=0.5)
         r = FrameRenderer(cfg)
@@ -180,6 +181,35 @@ def test_image_effects_return_to_start_and_animate(tmp_path):
         start, middle, end = r.render(0), r.render(n // 2), r.render(n - 1)
         assert np.array_equal(start, end), effect       # final frame == first
         assert not np.array_equal(start, middle), effect  # visibly animates
+
+
+def test_bounce_starts_at_configured_position(tmp_path):
+    from projgen.core.config import ImageEffect
+
+    cfg = _image_cfg(tmp_path, pos_x=0.3, pos_y=0.6, scale=0.2)
+    static = FrameRenderer(cfg).render(0)
+    cfg.image.effect = ImageEffect.BOUNCE
+    bounced = FrameRenderer(cfg).render(0)
+    assert np.array_equal(static, bounced)  # frame 0 sits at the configured spot
+
+
+def test_image_layer_order_relative_to_grid(tmp_path):
+    cfg = _image_cfg(tmp_path, scale=4.0)  # red logo covers the whole canvas
+    cfg.grid.enabled = True
+    cfg.grid.rows = cfg.grid.cols = 2
+    cfg.grid.line_color = (0.0, 1.0, 0.0)
+    cfg.grid.line_opacity = 1.0
+    cfg.grid.show_labels = False
+
+    def has_green(frame):
+        return bool(((frame[..., 1] > 200) & (frame[..., 0] < 100)).any())
+
+    behind = FrameRenderer(cfg).render(0)
+    assert has_green(behind)  # grid lines drawn over the image
+
+    cfg.image.above_grid = True
+    above = FrameRenderer(cfg).render(0)
+    assert not has_green(above)  # image hides the grid
 
 
 def test_missing_image_file_is_reported(tmp_path):

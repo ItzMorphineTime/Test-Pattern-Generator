@@ -31,8 +31,10 @@ is small, fast, deterministic, pixel-exact, and can composite overlays with plai
   coordinates) with configurable grid lines, font size, colours, and optional dark label
   pads. Ideal for calling out regions during alignment ("artifact in cell D7").
 - **Image / logo overlay** — composite a custom picture onto the pattern with position,
-  scale, and opacity controls, plus optional seamless effects (grow & shrink, fade, spin)
-  that complete whole cycles per loop so the final frame returns to the start.
+  scale, opacity, and grid-layering (behind / on top) controls, plus optional seamless
+  effects — grow & shrink, fade, spin, and a screensaver-style bounce that drifts
+  diagonally off the edges — all completing whole cycles per loop so the final frame
+  returns to the start. Selecting an effect starts the preview so it plays in action.
 - **Any format** — H.264 / H.265 MP4, VP9 WebM, AV1, ProRes 422 HQ MOV, lossless FFV1 MKV,
   or a PNG image sequence. Even-dimension and NTSC frame-rate handling built in.
 - **Live preview** with a frame scrubber and play/pause, so you can eyeball seamlessness.
