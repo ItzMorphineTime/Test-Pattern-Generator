@@ -29,6 +29,12 @@ class FrameRenderer:
             self._grid_overlay = overlays.build_grid_overlay(
                 config.grid, config.output.width, config.output.height, font_family
             )
+        self._image_overlay: overlays.ImageOverlay | None = None
+        if config.image.enabled:
+            overlay = overlays.ImageOverlay(
+                config.image, config.output.width, config.output.height
+            )
+            self._image_overlay = overlay if overlay.loaded else None
 
     def render(self, frame_index: int) -> np.ndarray:
         cfg = self.config
@@ -44,6 +50,11 @@ class FrameRenderer:
             frame = overlays.apply_lines(frame, cfg.h_lines, frame_index, n, "h")
         if cfg.v_lines.enabled:
             frame = overlays.apply_lines(frame, cfg.v_lines, frame_index, n, "v")
+
+        if self._image_overlay is not None:
+            layer = self._image_overlay.layer(frame_index, n)
+            if layer is not None:
+                frame = overlays.composite_rgba(frame, layer)
 
         if self._grid_overlay is not None:
             frame = overlays.composite_rgba(frame, self._grid_overlay)

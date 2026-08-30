@@ -31,7 +31,14 @@ from PySide6.QtWidgets import (
 )
 
 from ..core import encoder
-from ..core.config import Axis, LabelMode, LineGroupConfig, LineStyle, ProjectConfig
+from ..core.config import (
+    Axis,
+    ImageEffect,
+    LabelMode,
+    LineGroupConfig,
+    LineStyle,
+    ProjectConfig,
+)
 from ..core.render import FrameRenderer
 from ..resources import icon_path
 from .preview import PreviewWidget
@@ -104,6 +111,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._build_line_group("Horizontal Lines", self.config.h_lines, "h"))
         layout.addWidget(self._build_line_group("Vertical Lines", self.config.v_lines, "v"))
         layout.addWidget(self._build_grid_group())
+        layout.addWidget(self._build_image_group())
         layout.addWidget(self._build_preset_buttons())
         layout.addStretch(1)
         return panel
@@ -297,6 +305,77 @@ class MainWindow(QMainWindow):
         form.addRow("Grid lines", show_lines)
         form.addRow("Label background", cell_bg)
         return box
+
+    def _build_image_group(self) -> QGroupBox:
+        box = QGroupBox("Image / Logo")
+        box.setCheckable(True)
+        box.setChecked(self.config.image.enabled)
+        box.toggled.connect(lambda on: self._set("image.enabled", on))
+        form = QFormLayout(box)
+        img = self.config.image
+
+        self.w_image_path = QLineEdit(img.path)
+        self.w_image_path.setPlaceholderText("Choose an image file...")
+        self.w_image_path.textChanged.connect(lambda t: self._set("image.path", t))
+        browse = QPushButton("Browse...")
+        browse.clicked.connect(self._browse_image)
+        path_row = QHBoxLayout()
+        path_row.setContentsMargins(0, 0, 0, 0)
+        path_row.addWidget(self.w_image_path, 1)
+        path_row.addWidget(browse)
+        path_wrap = QWidget()
+        path_wrap.setLayout(path_row)
+
+        pos_x = float_spin(0.0, 100.0, img.pos_x * 100.0, 1.0, 1, " %")
+        pos_y = float_spin(0.0, 100.0, img.pos_y * 100.0, 1.0, 1, " %")
+        scale = float_spin(1.0, 400.0, img.scale * 100.0, 1.0, 1, " %")
+        scale.setToolTip("Rendered image width as a percentage of the canvas width.")
+        opacity = float_spin(0.0, 1.0, img.opacity, 0.05)
+        effect = QComboBox()
+        for eff, text in ((ImageEffect.NONE, "None (static)"),
+                          (ImageEffect.PULSE, "Grow && Shrink"),
+                          (ImageEffect.FADE, "Fade"),
+                          (ImageEffect.SPIN, "Spin")):
+            effect.addItem(text, eff)
+        effect.setCurrentIndex(effect.findData(img.effect))
+        cycles = int_spin(1, 100, img.effect_cycles)
+        cycles.setToolTip("Whole effect cycles per loop, so the final frame "
+                          "returns to the start.")
+        amount = float_spin(0.0, 1.0, img.effect_amount, 0.05)
+        amount.setToolTip("Effect strength (size change, fade depth).")
+
+        pos_x.valueChanged.connect(lambda v: self._set("image.pos_x", v / 100.0))
+        pos_y.valueChanged.connect(lambda v: self._set("image.pos_y", v / 100.0))
+        scale.valueChanged.connect(lambda v: self._set("image.scale", v / 100.0))
+        opacity.valueChanged.connect(lambda v: self._set("image.opacity", v))
+        effect.currentIndexChanged.connect(
+            lambda: self._set("image.effect", effect.currentData()))
+        cycles.valueChanged.connect(lambda v: self._set("image.effect_cycles", v))
+        amount.valueChanged.connect(lambda v: self._set("image.effect_amount", v))
+
+        pos_row = QHBoxLayout()
+        pos_row.setContentsMargins(0, 0, 0, 0)
+        pos_row.addWidget(pos_x)
+        pos_row.addWidget(QLabel("x"))
+        pos_row.addWidget(pos_y)
+        pos_wrap = QWidget()
+        pos_wrap.setLayout(pos_row)
+
+        form.addRow("File", path_wrap)
+        form.addRow("Position", pos_wrap)
+        form.addRow("Scale", scale)
+        form.addRow("Opacity", opacity)
+        form.addRow("Effect", effect)
+        form.addRow("Effect cycles", cycles)
+        form.addRow("Effect amount", amount)
+        return box
+
+    def _browse_image(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Choose image", "",
+            "Images (*.png *.jpg *.jpeg *.bmp *.gif *.webp);;All files (*)")
+        if path:
+            self.w_image_path.setText(path)
 
     def _build_preset_buttons(self) -> QWidget:
         wrap = QWidget()

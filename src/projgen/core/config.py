@@ -33,6 +33,13 @@ class LabelMode(str, Enum):
     ALPHA_NUM = "alpha_num"    # A1, B2, ...
 
 
+class ImageEffect(str, Enum):
+    NONE = "none"
+    PULSE = "pulse"  # grow & shrink
+    FADE = "fade"    # opacity breathe
+    SPIN = "spin"    # rotate
+
+
 RGB = tuple[float, float, float]
 
 
@@ -95,12 +102,28 @@ class GridConfig:
 
 
 @dataclass
+class ImageConfig:
+    """A custom image/logo composited onto the pattern."""
+
+    enabled: bool = False
+    path: str = ""
+    pos_x: float = 0.5   # centre position as a fraction of the canvas width
+    pos_y: float = 0.5   # centre position as a fraction of the canvas height
+    scale: float = 0.25  # rendered image width as a fraction of the canvas width
+    opacity: float = 1.0
+    effect: ImageEffect = ImageEffect.NONE
+    effect_cycles: int = 1     # whole cycles per loop -> returns to start
+    effect_amount: float = 0.3  # effect strength, 0..1
+
+
+@dataclass
 class ProjectConfig:
     output: OutputConfig = field(default_factory=OutputConfig)
     color_loop: ColorLoopConfig = field(default_factory=ColorLoopConfig)
     h_lines: LineGroupConfig = field(default_factory=LineGroupConfig)
     v_lines: LineGroupConfig = field(default_factory=LineGroupConfig)
     grid: GridConfig = field(default_factory=GridConfig)
+    image: ImageConfig = field(default_factory=ImageConfig)
 
     # -- derived ---------------------------------------------------------
     def total_frames(self) -> int:
@@ -174,7 +197,9 @@ _RESOLVE = {
     "ColorLoopConfig": ColorLoopConfig,
     "LineGroupConfig": LineGroupConfig,
     "GridConfig": GridConfig,
+    "ImageConfig": ImageConfig,
     "Axis": Axis,
     "LineStyle": LineStyle,
     "LabelMode": LabelMode,
+    "ImageEffect": ImageEffect,
 }

@@ -4,16 +4,27 @@
   Motion uses an integer number of sweeps per loop, so it stays seamless.
 * Number grid — a static grid of labelled cells, rendered once with Pillow and
   alpha-composited onto every frame.
+* Image / logo — a custom picture positioned and scaled on the canvas, with
+  optional seamless effects (grow & shrink, fade, spin).
 """
 
 from __future__ import annotations
 
+import math
+import os
 from functools import lru_cache
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-from .config import GridConfig, LabelMode, LineGroupConfig, LineStyle
+from .config import (
+    GridConfig,
+    ImageConfig,
+    ImageEffect,
+    LabelMode,
+    LineGroupConfig,
+    LineStyle,
+)
 
 
 def _rgb_u8(color) -> np.ndarray:
@@ -191,3 +202,96 @@ def composite_rgba(frame: np.ndarray, overlay_rgba: np.ndarray) -> np.ndarray:
     rgb = overlay_rgba[..., :3].astype(np.float32)
     out = frame.astype(np.float32) * (1.0 - alpha) + rgb * alpha
     return np.clip(out, 0, 255).astype(np.uint8)
+
+
+# ---------------------------------------------------------------------------
+# Image / logo overlay
+# ---------------------------------------------------------------------------
+@lru_cache(maxsize=8)
+def _load_image(path: str, mtime: float) -> Image.Image:
+    """Load and cache a source image as RGBA (mtime busts the cache on edits)."""
+    del mtime  # cache key only
+    with Image.open(path) as img:
+        return img.convert("RGBA")
+
+
+class ImageOverlay:
+    """Renders a custom image/logo layer for each frame.
+
+    Effects animate over the ``N - 1`` frame span with whole cycles, so the
+    final rendered frame returns to the starting state — the same seamless
+    convention the tracking lines use.  A static image (no effect) is rendered
+    once and cached.
+    """
+
+    def __init__(self, cfg: ImageConfig, width: int, height: int):
+        self.cfg = cfg
+        self.width = width
+        self.height = height
+        self._source: Image.Image | None = None
+        self._static_layer: np.ndarray | None = None
+        if cfg.enabled and cfg.path and os.path.isfile(cfg.path):
+            try:
+                self._source = _load_image(cfg.path, os.path.getmtime(cfg.path))
+            except OSError:
+                self._source = None
+
+    @property
+    def loaded(self) -> bool:
+        return self._source is not None
+
+    # -- per-frame parameters -------------------------------------------
+    def _phase(self, frame_index: int, total_frames: int) -> float:
+        span = max(1, total_frames - 1)  # final frame returns to the start
+        cycles = max(0, int(self.cfg.effect_cycles))
+        return (frame_index / span) * cycles
+
+    def _size_factor(self, phase: float) -> float:
+        if self.cfg.effect is ImageEffect.PULSE:
+            return max(0.05, 1.0 + self.cfg.effect_amount * math.sin(2 * math.pi * phase))
+        return 1.0
+
+    def _alpha_factor(self, phase: float) -> float:
+        if self.cfg.effect is ImageEffect.FADE:
+            dip = 0.5 - 0.5 * math.cos(2 * math.pi * phase)
+            return 1.0 - min(1.0, self.cfg.effect_amount) * dip
+        return 1.0
+
+    def _angle(self, phase: float) -> float:
+        if self.cfg.effect is ImageEffect.SPIN:
+            return -360.0 * phase
+        return 0.0
+
+    # -- rendering -------------------------------------------------------
+    def layer(self, frame_index: int, total_frames: int) -> np.ndarray | None:
+        """The ``(H, W, 4)`` uint8 layer for this frame, or None if unloaded."""
+        if self._source is None:
+            return None
+        if self.cfg.effect is ImageEffect.NONE:
+            if self._static_layer is None:
+                self._static_layer = self._render(1.0, 1.0, 0.0)
+            return self._static_layer
+        phase = self._phase(frame_index, total_frames)
+        return self._render(self._size_factor(phase), self._alpha_factor(phase),
+                            self._angle(phase))
+
+    def _render(self, size_factor: float, alpha_factor: float,
+                angle: float) -> np.ndarray:
+        cfg = self.cfg
+        src = self._source
+        target_w = max(1, round(self.width * cfg.scale * size_factor))
+        target_h = max(1, round(target_w * src.height / src.width))
+        img = src.resize((target_w, target_h), Image.LANCZOS)
+        if angle:
+            img = img.rotate(angle, expand=True, resample=Image.BICUBIC)
+
+        canvas = Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
+        left = round(cfg.pos_x * self.width - img.width / 2)
+        top = round(cfg.pos_y * self.height - img.height / 2)
+        canvas.paste(img, (left, top), img)
+
+        layer = np.asarray(canvas).copy()
+        opacity = np.clip(cfg.opacity * alpha_factor, 0.0, 1.0)
+        if opacity < 1.0:
+            layer[..., 3] = (layer[..., 3].astype(np.float32) * opacity).astype(np.uint8)
+        return layer

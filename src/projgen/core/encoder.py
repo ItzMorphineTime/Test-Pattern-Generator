@@ -128,6 +128,9 @@ def validate(config: ProjectConfig) -> list[str]:
         problems.append("Frame rate must be positive.")
     if config.output.duration <= 0:
         problems.append("Duration must be positive.")
+    img = config.image
+    if img.enabled and img.path and not Path(img.path).is_file():
+        problems.append(f"Image/logo file not found: {img.path}")
     return problems
 
 

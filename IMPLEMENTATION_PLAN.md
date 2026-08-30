@@ -30,6 +30,15 @@ horizontal/vertical tracking lines and number grids.
 - **Windows small/details icon** — icon `.ico` small sizes are stored as BMP/DIB (not PNG),
   which Windows Explorer's small and details views require, so they no longer fall back to
   the default icon.
+- **Image / logo overlay** — a custom picture composited between the lines and the grid,
+  with centre position (%), scale (% of canvas width), opacity, and optional effects:
+  grow & shrink (pulse), fade, spin. Effects run whole cycles across the `N-1` frame span,
+  so the final frame returns to the start (same convention as the lines). Exposed in the
+  GUI group *Image / Logo* and via `--image*` CLI flags; missing files fail validation.
+- **Faithful preview scaling** — pixel-based sizes (fixed grid font size, grid/tracking
+  line thicknesses) are scaled by the preview's downscale factor, so the preview matches
+  the final render proportionally.
+- **App icon source** — regenerated from `src/JLoe.png` (replaces the earlier artwork).
 - **Cross-platform builds** — one spec builds Windows (`.exe`) and macOS (single-file
   binary **and** `.app` bundle) with the right icon per platform (`.ico` / `.icns`).
   Built via `packaging/build.ps1` (Windows) or `packaging/build_mac.sh` (macOS).

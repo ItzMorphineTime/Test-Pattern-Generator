@@ -30,6 +30,9 @@ is small, fast, deterministic, pixel-exact, and can composite overlays with plai
 - **Number grid** — labelled cells (alpha-numeric `A1`, sequential, row/col, or pixel
   coordinates) with configurable grid lines, font size, colours, and optional dark label
   pads. Ideal for calling out regions during alignment ("artifact in cell D7").
+- **Image / logo overlay** — composite a custom picture onto the pattern with position,
+  scale, and opacity controls, plus optional seamless effects (grow & shrink, fade, spin)
+  that complete whole cycles per loop so the final frame returns to the start.
 - **Any format** — H.264 / H.265 MP4, VP9 WebM, AV1, ProRes 422 HQ MOV, lossless FFV1 MKV,
   or a PNG image sequence. Even-dimension and NTSC frame-rate handling built in.
 - **Live preview** with a frame scrubber and play/pause, so you can eyeball seamlessness.
@@ -120,6 +123,10 @@ py -m projgen.cli --width 1920 --height 1080 --fps 25 --duration 10 \
 
 # lossless archival master
 py -m projgen.cli --preset ffv1_mkv --width 3840 --height 2160 -o output/master
+
+# overlay a pulsing logo in the lower-right corner
+py -m projgen.cli --image logo.png --image-pos 85,85 --image-scale 15 \
+    --image-effect pulse --image-cycles 2 -o output/branded
 
 # render from a saved GUI preset
 py -m projgen.cli --config myshow.json -o output/myshow

@@ -140,6 +140,63 @@ def test_cell_labels(mode, row, col, expected):
     assert overlays.cell_label(mode, row, col, 4, 10.0, 10.0) == expected
 
 
+# --- image / logo overlay -------------------------------------------------
+def _logo(tmp_path):
+    from PIL import Image
+
+    path = tmp_path / "logo.png"
+    img = Image.new("RGBA", (24, 16), (255, 0, 0, 255))
+    img.save(path)
+    return str(path)
+
+
+def _image_cfg(tmp_path, **kw):
+    from projgen.core.config import ImageEffect  # noqa: F401 (re-export guard)
+
+    cfg = _tiny()
+    cfg.color_loop.enabled = False
+    cfg.image.enabled = True
+    cfg.image.path = _logo(tmp_path)
+    for k, v in kw.items():
+        setattr(cfg.image, k, v)
+    return cfg
+
+
+def test_static_image_is_composited(tmp_path):
+    cfg = _image_cfg(tmp_path)
+    frame = FrameRenderer(cfg).render(0)
+    assert (frame[..., 0] > 200).any()  # red logo pixels present
+    assert np.array_equal(frame, FrameRenderer(cfg).render(5))  # static
+
+
+def test_image_effects_return_to_start_and_animate(tmp_path):
+    from projgen.core.config import ImageEffect
+
+    for effect in (ImageEffect.PULSE, ImageEffect.FADE, ImageEffect.SPIN):
+        cfg = _image_cfg(tmp_path, effect=effect, effect_cycles=1,
+                         effect_amount=0.5)
+        r = FrameRenderer(cfg)
+        n = cfg.total_frames()
+        start, middle, end = r.render(0), r.render(n // 2), r.render(n - 1)
+        assert np.array_equal(start, end), effect       # final frame == first
+        assert not np.array_equal(start, middle), effect  # visibly animates
+
+
+def test_missing_image_file_is_reported(tmp_path):
+    cfg = _tiny()
+    cfg.image.enabled = True
+    cfg.image.path = str(tmp_path / "nope.png")
+    problems = encoder.validate(cfg)
+    assert any("not found" in p for p in problems)
+
+
+def test_missing_image_render_is_graceful(tmp_path):
+    cfg = _tiny()
+    cfg.image.enabled = True
+    cfg.image.path = str(tmp_path / "nope.png")
+    FrameRenderer(cfg).render(0)  # must not raise
+
+
 # --- config ---------------------------------------------------------------
 def test_config_json_roundtrip_preserves_enums_and_tuples():
     cfg = _tiny()
