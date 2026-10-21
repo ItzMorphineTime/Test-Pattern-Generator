@@ -5,6 +5,9 @@ mapping — a smoothly scrolling colour loop with optional **horizontal/vertical
 lines** and **number grids**, exported to any common video format.
 
 No Blender, no dependencies to install for end users: it ships as a single Windows `.exe`.
+The black & burst sync test also runs in any browser, with nothing to install:
+**[open the web version](https://itzmorphinetime.github.io/Test-Pattern-Generator/)**
+(source in [`black-burst-web/`](black-burst-web/)).
 
 ![Sample output pattern](docs/sample.png)
 
@@ -35,15 +38,19 @@ is small, fast, deterministic, pixel-exact, and can composite overlays with plai
   effects — grow & shrink, fade, spin, and a screensaver-style bounce that drifts
   diagonally off the edges — all completing whole cycles per loop so the final frame
   returns to the start.
-- **Black & burst sync test** (its own tab) — the background flips black/white every
-  second, red/green/blue regions across the top each show for a third of the second
-  (fps/3 frames; uneven rates split e.g. 9/8/8 at 25 fps), and every frame shows its frame
-  and second number. Exports as video, optionally with every frame as a numbered PNG.
+- **Black & burst sync test** (its own tab, and a [web version](black-burst-web/)) — the
+  background flips black/white every second, red/green/blue regions across the top each
+  show for a third of the second (fps/3 frames; uneven rates split e.g. 9/8/8 at 25 fps),
+  and every frame shows its frame and second number. Exports as video, optionally with
+  every frame as a numbered PNG.
 - **Any format** — H.264 / H.265 MP4, VP9 WebM, AV1, ProRes 422 HQ MOV, lossless FFV1 MKV,
   or a PNG image sequence. Even-dimension and NTSC frame-rate handling built in.
 - **Live preview** with a frame scrubber and play/pause, so you can eyeball seamlessness.
 - **Presets** — save/load every setting, for both tabs, as a JSON file.
 - **GUI and CLI** — a polished PySide6 interface, plus a headless command line for batch jobs.
+- **Morph branded** — both apps follow the Morph Brand System V2: Morph Black, Studio
+  White, Signal Red for motion, Pivot Gold for the one decisive action, and Montserrat,
+  which is also used for the text burned into the patterns.
 
 ## Format presets
 
@@ -101,9 +108,10 @@ python -m PyInstaller packaging/projgen.spec --clean --noconfirm
 The FFmpeg libraries are bundled automatically — PyAV ships them and the PyInstaller spec
 collects them, so every codec above works in the frozen app with no extra binaries.
 
-The app icon lives at `src/projgen/assets/` (`icon.ico` for Windows and the runtime window,
-`icon.icns` for macOS) and is used for both the executable and the application window.
-Replace those files to rebrand, then rebuild.
+The app icon is the Morph app icon, rendered from the brand SVG into
+`src/projgen/assets/` (`icon.ico` for Windows and the runtime window, `icon.icns` for
+macOS). The same folder holds the wordmark, the Montserrat fonts, and the stylesheet's
+arrow images; the spec bundles all of it.
 
 > **Windows icon cache:** after rebuilding, Explorer may still show the previous icon from
 > its cache. Copy the exe to a new name, or clear the cache
@@ -166,11 +174,14 @@ src/projgen/
 │   ├── render.py      # composes base pattern + overlays
 │   ├── burst.py       # black & burst sync test
 │   └── encoder.py     # PyAV encoding + format presets
-├── ui/            # PySide6 GUI (tabbed window, pages, preview, export bar, theme)
+├── ui/            # PySide6 GUI (branded header, pages, preview, export bar, theme)
+├── assets/        # app icon, Morph wordmark, Montserrat, UI images
 ├── cli.py         # headless command line
 └── __main__.py    # GUI with no args, CLI with args
 packaging/         # PyInstaller spec + build script
 tests/             # pytest suite
+black-burst-web/   # standalone browser version of the black & burst tool
+.github/workflows/ # GitHub Pages deployment for the web version
 ```
 
 The `core` package never imports Qt, so the engine is fully testable and reusable.
@@ -184,4 +195,6 @@ distributing binaries publicly.
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE).
+MIT — see [`LICENSE`](LICENSE). Montserrat is distributed under the SIL Open Font
+License (`OFL.txt` beside each copy of the font). The Morph name and logos belong to Morph
+and aren't covered by the MIT licence.

@@ -18,6 +18,8 @@ burst sync test video (M7).
 | M5 — Packaging (single-file PyInstaller exe) + README | ✅ done |
 | M6 — Post-review refinements (see below) | ✅ done |
 | M7 — Black & Burst sync test tool (second tab + `--burst` CLI) | ✅ done |
+| M8 — Black & Burst web app (`black-burst-web/`, GitHub Pages) | ✅ done |
+| M9 — Morph brand applied to both apps | ✅ done |
 
 **M6 refinements (from first hands-on review):**
 - **Resizable control panel** — the left sidebar is now a splitter pane (min width, not
@@ -76,7 +78,47 @@ burst sync test video (M7).
 - **Architecture** — the encoder now takes any frame stream (`encode_frames`); the GUI's
   export bar, output-settings group, page layout, and render worker were extracted into
   shared pieces so both tabs behave identically. `BurstConfig` is nested in
-  `ProjectConfig`, so presets save both tabs; Load/Save Preset moved to the tab bar.
+  `ProjectConfig`, so presets save both tabs; Load/Save Preset moved to the tab bar
+  (and, in M9, into the branded header).
+
+**M8 — Black & Burst web app (`black-burst-web/`):**
+- **Standalone and static** — plain HTML, CSS and ES modules; no build step, no
+  dependencies, nothing uploaded. Serves from GitHub Pages via
+  `.github/workflows/pages.yml` (unit tests gate each deployment), or from any static host.
+- **Same output as the desktop tool** — `timing.js` and `layout.js` mirror `burst.py`,
+  down to Python's round-half-to-even, and are unit-tested against the desktop app's
+  values (for example the 1920×1080 region boxes).
+- **Frame-accurate MP4** — WebCodecs H.264 with explicit timestamps (no real-time
+  capture, so no dropped or doubled frames), choosing the lowest H.264 level that fits
+  and the best profile the browser supports. A minimal fast-start MP4 writer
+  (`mp4.js`) stores exact NTSC timing (30000/1001) and maps reordered (B-frame) streams
+  to display order with signed composition offsets. Cross-checked by muxing libx264
+  streams with and without B-frames and decoding them with FFmpeg.
+- **PNG frames** — a stored ZIP (`zip.js`), or written straight into a folder with the
+  File System Access API where available; named by burned-in frame number.
+- **Verified end to end** — MP4s and ZIPs exported in the browser were decoded with
+  FFmpeg / Python: exact frame counts and rates, and every frame's background and
+  region match the desktop timing rules (30 fps and the uneven 25 fps split).
+
+**M9 — Morph brand (Morph Brand System V2, `Morph Brand Assets/`):**
+- **Colour roles** — Morph Black and Studio White carry structure; Signal Red carries
+  motion (progress, focus rings, the active tab, the played part of the scrubber,
+  accent rules); Pivot Gold marks the single decisive action per page (Export / Download
+  MP4), with Morph Black text (10.89:1). States the brand doesn't define (hover, borders,
+  secondary text in dark mode) use tints of brand colours, not new hues.
+- **Desktop** — dark mode, as the brand directs for control surfaces; a header with the
+  Morph wordmark at its minimum width and 24 px clear space; the app icon is
+  `morph-app-icon-dark`, rendered from the SVG into `.ico` (BMP small sizes) and
+  `.icns`; Montserrat registered with Qt; chevron images for stylesheet arrows.
+- **Web** — the brand's own CSS token names, light mode by default and dark mode when the
+  system prefers it; the wordmark variant for each mode; the Morph favicon and app icon;
+  red small text only where it meets contrast (dark mode uses white eyebrows and red rules).
+- **Typography** — Montserrat (OFL, bundled from local copies) for both interfaces and
+  for burned-in text in every generator. Its figures are proportional, so counters draw
+  digits in fixed-width cells; text never shifts as numbers change.
+- The pattern colours themselves (pure R/G/B, black, white, the hue loop) are test
+  signals and stay unbranded. Only the logo files the apps use are committed; the full
+  brand folder (including its PDFs) stays out of the repository.
 
 **Decisions settled during implementation (differ from the first-pass plan):**
 - **Single-file executable** (`--onefile`) per request, not onedir. Trade-off: slightly
