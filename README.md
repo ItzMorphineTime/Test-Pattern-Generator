@@ -35,10 +35,14 @@ is small, fast, deterministic, pixel-exact, and can composite overlays with plai
   effects — grow & shrink, fade, spin, and a screensaver-style bounce that drifts
   diagonally off the edges — all completing whole cycles per loop so the final frame
   returns to the start.
+- **Black & burst sync test** (its own tab) — the background flips black/white every
+  second, red/green/blue regions across the top each show for a third of the second
+  (fps/3 frames; uneven rates split e.g. 9/8/8 at 25 fps), and every frame shows its frame
+  and second number. Exports as video, optionally with every frame as a numbered PNG.
 - **Any format** — H.264 / H.265 MP4, VP9 WebM, AV1, ProRes 422 HQ MOV, lossless FFV1 MKV,
   or a PNG image sequence. Even-dimension and NTSC frame-rate handling built in.
 - **Live preview** with a frame scrubber and play/pause, so you can eyeball seamlessness.
-- **Presets** — save/load every setting as a JSON file.
+- **Presets** — save/load every setting, for both tabs, as a JSON file.
 - **GUI and CLI** — a polished PySide6 interface, plus a headless command line for batch jobs.
 
 ## Format presets
@@ -130,6 +134,10 @@ py -m projgen.cli --preset ffv1_mkv --width 3840 --height 2160 -o output/master
 py -m projgen.cli --image logo.png --image-pos 85,85 --image-scale 15 \
     --image-effect pulse --image-cycles 2 -o output/branded
 
+# 30 fps black & burst sync test, plus every frame as a PNG (numbered from 1)
+py -m projgen.cli --burst --fps 30 --duration 10 --burst-png --burst-start 1 \
+    -o output/sync_test
+
 # render from a saved GUI preset
 py -m projgen.cli --config myshow.json -o output/myshow
 
@@ -154,10 +162,11 @@ src/projgen/
 │   ├── config.py      # dataclass settings + JSON presets
 │   ├── color.py       # vectorised HSV -> RGB
 │   ├── pattern.py     # seamless colour-loop frames
-│   ├── overlays.py    # tracking lines + number grid
+│   ├── overlays.py    # tracking lines, number grid, image/logo
 │   ├── render.py      # composes base pattern + overlays
+│   ├── burst.py       # black & burst sync test
 │   └── encoder.py     # PyAV encoding + format presets
-├── ui/            # PySide6 GUI (app, preview, worker, theme)
+├── ui/            # PySide6 GUI (tabbed window, pages, preview, export bar, theme)
 ├── cli.py         # headless command line
 └── __main__.py    # GUI with no args, CLI with args
 packaging/         # PyInstaller spec + build script

@@ -2,7 +2,8 @@
 
 Standalone desktop app (`.exe`) that generates seamless, loopable test patterns for
 projection mapping, exports them to any common video format, and overlays optional
-horizontal/vertical tracking lines and number grids.
+horizontal/vertical tracking lines and number grids. A second tool generates a black &
+burst sync test video (M7).
 
 ---
 
@@ -16,6 +17,7 @@ horizontal/vertical tracking lines and number grids.
 | M4 — PySide6 GUI (live preview, threaded export, presets) | ✅ done |
 | M5 — Packaging (single-file PyInstaller exe) + README | ✅ done |
 | M6 — Post-review refinements (see below) | ✅ done |
+| M7 — Black & Burst sync test tool (second tab + `--burst` CLI) | ✅ done |
 
 **M6 refinements (from first hands-on review):**
 - **Resizable control panel** — the left sidebar is now a splitter pane (min width, not
@@ -53,6 +55,28 @@ horizontal/vertical tracking lines and number grids.
   Built via `packaging/build.ps1` (Windows) or `packaging/build_mac.sh` (macOS).
 - **App icon** — bundled at `src/projgen/assets/` and embedded into the executable and used
   for the window/taskbar. (Windows Explorer may cache the old exe icon after a rebuild.)
+
+**M7 — Black & Burst sync test (`core/burst.py`, `ui/burst_page.py`):**
+- **Pattern** — every frame shows `FRAME nnnn` / `SECOND nn`; the background is black on
+  even seconds and white on odd ones (ink inverts to stay readable); three equal regions,
+  evenly spaced across the top, show red → green → blue, one at a time, each for a third
+  of the second, so the colour cycle stays in step with the flip.
+- **Timing rules** — a "second" is `round(fps)` frames, like non-drop-frame timecode, so
+  29.97 fps counts 30. The region for frame `f` within a second of `n` frames is
+  `3f // n`, which spreads uneven rates as evenly as possible (25 fps → 9/8/8). Below
+  3 fps a colour would never show, so validation rejects it.
+- **Counters** — size is a fraction of canvas height but auto-shrinks to fit the width
+  and the space under the regions; each line is left-anchored at the position that centres
+  its widest possible label, so text never shifts between frames. Numbering starts at 0
+  (timecode style) or 1.
+- **Export** — any format preset. *Also export every frame as a PNG* tees frames into a
+  `<name>_frames/` folder during the same encode pass, named by the burned-in frame number;
+  it's disabled for the PNG-sequence format, which already does that. PNG frames are
+  pixel-exact; lossy 4:2:0 formats shift pure colours by a level or two.
+- **Architecture** — the encoder now takes any frame stream (`encode_frames`); the GUI's
+  export bar, output-settings group, page layout, and render worker were extracted into
+  shared pieces so both tabs behave identically. `BurstConfig` is nested in
+  `ProjectConfig`, so presets save both tabs; Load/Save Preset moved to the tab bar.
 
 **Decisions settled during implementation (differ from the first-pass plan):**
 - **Single-file executable** (`--onefile`) per request, not onedir. Trade-off: slightly
