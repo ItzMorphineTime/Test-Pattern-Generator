@@ -141,6 +141,25 @@ def test_png_option_is_not_duplicated_for_sequence_output(tmp_path):
     assert burst.png_frames_dir(cfg) is None
 
 
+def test_cli_burst_mode_routes_output_flags_and_renders(tmp_path):
+    from projgen import cli
+
+    args = cli.build_parser().parse_args(
+        ["--burst", "--width", "64", "--height", "48", "--fps", "25",
+         "--duration", "0.4", "--burst-png", "--burst-start", "1",
+         "-o", str(tmp_path / "sync")])
+    cfg = cli.config_from_args(args)
+    assert cfg.burst.output.fps == 25 and cfg.burst.output.width == 64
+    assert cfg.output.width == 1920  # colour loop output untouched
+
+    assert cli.main(["--burst", "--width", "64", "--height", "48", "--fps", "25",
+                     "--duration", "0.4", "--burst-png", "--burst-start", "1",
+                     "-o", str(tmp_path / "sync")]) == 0
+    assert (tmp_path / "sync.mp4").is_file()
+    names = sorted(p.name for p in (tmp_path / "sync_frames").iterdir())
+    assert names[0] == "frame_0001.png" and len(names) == 10
+
+
 def test_burst_settings_round_trip_through_presets():
     project = ProjectConfig()
     project.burst.start_number = 1
