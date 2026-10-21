@@ -56,6 +56,10 @@ class OutputConfig:
     bitrate: str | None = None  # e.g. "12M"
     output_path: str = "output/colour_loop"
 
+    def total_frames(self) -> int:
+        """Whole frame count for the duration (minimum one frame)."""
+        return max(1, round(float(self.duration) * float(self.fps)))
+
 
 @dataclass
 class ColorLoopConfig:
@@ -119,6 +123,24 @@ class ImageConfig:
 
 
 @dataclass
+class BurstConfig:
+    """Black & burst sync test: the background flips black/white every second,
+    three regions across the top cycle red/green/blue, and every frame shows
+    its frame and second number."""
+
+    output: OutputConfig = field(default_factory=lambda: OutputConfig(
+        fps=30.0, output_path="output/black_burst"))
+    region_height: float = 0.25  # R/G/B region height, fraction of canvas height
+    region_gap: float = 0.04     # gap around/between regions, fraction of width
+    text_size: float = 0.12      # counter text height, fraction of canvas height
+    start_number: int = 0        # number shown on the first frame and second
+    export_png: bool = False     # also write every frame as a PNG
+
+    def total_frames(self) -> int:
+        return self.output.total_frames()
+
+
+@dataclass
 class ProjectConfig:
     output: OutputConfig = field(default_factory=OutputConfig)
     color_loop: ColorLoopConfig = field(default_factory=ColorLoopConfig)
@@ -126,11 +148,12 @@ class ProjectConfig:
     v_lines: LineGroupConfig = field(default_factory=LineGroupConfig)
     grid: GridConfig = field(default_factory=GridConfig)
     image: ImageConfig = field(default_factory=ImageConfig)
+    burst: BurstConfig = field(default_factory=BurstConfig)
 
     # -- derived ---------------------------------------------------------
     def total_frames(self) -> int:
         """Whole frame count for exactly one loop (minimum one frame)."""
-        return max(1, round(float(self.output.duration) * float(self.output.fps)))
+        return self.output.total_frames()
 
     # -- serialisation ---------------------------------------------------
     def to_dict(self) -> dict[str, Any]:
@@ -200,6 +223,7 @@ _RESOLVE = {
     "LineGroupConfig": LineGroupConfig,
     "GridConfig": GridConfig,
     "ImageConfig": ImageConfig,
+    "BurstConfig": BurstConfig,
     "Axis": Axis,
     "LineStyle": LineStyle,
     "LabelMode": LabelMode,

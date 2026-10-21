@@ -119,7 +119,7 @@ def apply_lines(frame: np.ndarray, cfg: LineGroupConfig, frame_index: int,
 # Number grid
 # ---------------------------------------------------------------------------
 @lru_cache(maxsize=8)
-def _load_font(size: int, family: str | None) -> ImageFont.ImageFont:
+def load_font(size: int, family: str | None) -> ImageFont.ImageFont:
     size = max(6, int(size))
     if family:
         try:
@@ -176,7 +176,7 @@ def build_grid_overlay(cfg: GridConfig, width: int, height: int,
 
     if cfg.show_labels and cfg.label_opacity > 0.0:
         size = cfg.font_size or max(8, int(min(cell_w, cell_h) * 0.3))
-        font = _load_font(size, font_family)
+        font = load_font(size, font_family)
         fc = tuple(int(round(c * 255)) for c in cfg.font_color)
         font_rgba = (*fc, int(round(cfg.label_opacity * 255)))
         for r in range(rows):

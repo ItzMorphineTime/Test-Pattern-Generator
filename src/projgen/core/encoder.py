@@ -1,9 +1,12 @@
 """Video/image-sequence encoding via PyAV (FFmpeg).
 
 Format presets map a friendly name to a concrete ``(container, codec, pixel
-format, quality)`` combination.  The encoder feeds RGB frames from
-:mod:`projgen.core.render` into the chosen codec, reporting progress and honouring
-a cancel request.
+format, quality)`` combination.  :func:`encode_frames` feeds any stream of RGB
+frames into the chosen codec, reporting progress and honouring a cancel request;
+:func:`encode` wires it to the colour-loop renderer.
+
+Helpers that take a ``config`` accept anything with an ``output`` attribute
+(:class:`ProjectConfig` or :class:`BurstConfig`).
 """
 
 from __future__ import annotations
@@ -11,13 +14,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from fractions import Fraction
 from pathlib import Path
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Iterator
 
 import av
 import numpy as np
 from PIL import Image
 
-from .config import ProjectConfig
+from .config import OutputConfig, ProjectConfig
 from .render import iter_frames
 
 ProgressFn = Callable[[int, int], None]
@@ -94,14 +97,14 @@ def fps_fraction(fps: float) -> Fraction:
     return Fraction(fps).limit_denominator(100000)
 
 
-def get_preset(config: ProjectConfig) -> FormatPreset:
-    return FORMAT_PRESETS.get(config.output.preset, FORMAT_PRESETS[DEFAULT_PRESET])
+def preset_for(output: OutputConfig) -> FormatPreset:
+    return FORMAT_PRESETS.get(output.preset, FORMAT_PRESETS[DEFAULT_PRESET])
 
 
-def resolve_output_path(config: ProjectConfig) -> Path:
+def output_path_for(output: OutputConfig) -> Path:
     """Full output path with the correct extension (or directory for sequences)."""
-    preset = get_preset(config)
-    base = Path(config.output.output_path)
+    preset = preset_for(output)
+    base = Path(output.output_path)
     if preset.is_sequence:
         return base  # treated as a directory
     if base.suffix.lower() != preset.extension:
@@ -109,27 +112,36 @@ def resolve_output_path(config: ProjectConfig) -> Path:
     return base
 
 
+def get_preset(config) -> FormatPreset:
+    return preset_for(config.output)
+
+
+def resolve_output_path(config) -> Path:
+    return output_path_for(config.output)
+
+
 class DimensionError(ValueError):
     """Raised when the resolution is invalid for the selected codec."""
 
 
-def validate(config: ProjectConfig) -> list[str]:
+def validate(config) -> list[str]:
     """Return a list of human-readable problems (empty if the config is valid)."""
     problems: list[str] = []
-    preset = get_preset(config)
-    w, h = config.output.width, config.output.height
+    output = config.output
+    preset = preset_for(output)
+    w, h = output.width, output.height
     if w < 2 or h < 2:
         problems.append("Width and height must be at least 2 pixels.")
     if preset.requires_even and (w % 2 or h % 2):
         problems.append(
             f"{preset.label} needs even width and height (got {w}x{h})."
         )
-    if config.output.fps <= 0:
+    if output.fps <= 0:
         problems.append("Frame rate must be positive.")
-    if config.output.duration <= 0:
+    if output.duration <= 0:
         problems.append("Duration must be positive.")
-    img = config.image
-    if img.enabled and img.path and not Path(img.path).is_file():
+    img = getattr(config, "image", None)
+    if img is not None and img.enabled and img.path and not Path(img.path).is_file():
         problems.append(f"Image/logo file not found: {img.path}")
     return problems
 
@@ -137,10 +149,10 @@ def validate(config: ProjectConfig) -> list[str]:
 # ---------------------------------------------------------------------------
 # Encoding
 # ---------------------------------------------------------------------------
-def _stream_options(config: ProjectConfig, preset: FormatPreset) -> dict:
+def _stream_options(output: OutputConfig, preset: FormatPreset) -> dict:
     opts = dict(preset.options)
     if preset.quality_kind == "crf":
-        crf = config.output.crf if config.output.crf is not None else preset.default_crf
+        crf = output.crf if output.crf is not None else preset.default_crf
         opts["crf"] = str(crf)
     return opts
 
@@ -151,7 +163,7 @@ def encode(
     cancel: CancelFn | None = None,
     font_family: str | None = None,
 ) -> Path:
-    """Render and encode the whole loop; return the written path.
+    """Render and encode the whole colour loop; return the written path.
 
     ``progress(done, total)`` is called after each frame; ``cancel()`` returning
     True stops early (a partial file may remain).
@@ -159,31 +171,60 @@ def encode(
     problems = validate(config)
     if problems:
         raise DimensionError(" ".join(problems))
-
-    preset = get_preset(config)
-    out_path = resolve_output_path(config)
-    total = config.total_frames()
     frames = iter_frames(config, font_family)
+    return encode_frames(config.output, frames, config.total_frames(), progress, cancel)
 
+
+def encode_frames(
+    output: OutputConfig,
+    frames: Iterable[np.ndarray],
+    total: int,
+    progress: ProgressFn | None = None,
+    cancel: CancelFn | None = None,
+    sequence_start: int = 0,
+) -> Path:
+    """Encode ``total`` RGB frames with ``output``'s format; return the written path.
+
+    ``sequence_start`` is the number in the first image-sequence file name.
+    """
+    preset = preset_for(output)
+    out_path = output_path_for(output)
     if preset.is_sequence:
-        return _encode_sequence(frames, out_path, total, preset, progress, cancel)
-    return _encode_video(config, frames, out_path, total, preset, progress, cancel)
+        return _encode_sequence(frames, out_path, total, preset, progress, cancel,
+                                sequence_start)
+    return _encode_video(output, frames, out_path, total, preset, progress, cancel)
 
 
-def _encode_video(config, frames, out_path: Path, total: int, preset: FormatPreset,
-                  progress: ProgressFn | None, cancel: CancelFn | None) -> Path:
+def frame_file_pad(total: int, start: int = 0) -> int:
+    """Zero-padding width for numbered frame files."""
+    return max(4, len(str(total + start)))
+
+
+def tee_png_frames(frames: Iterable[np.ndarray], out_dir: Path, total: int,
+                   start: int = 0) -> Iterator[np.ndarray]:
+    """Pass frames through unchanged while also saving each one as a PNG."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    pad = frame_file_pad(total, start)
+    for i, frame_np in enumerate(frames):
+        Image.fromarray(frame_np).save(out_dir / f"frame_{start + i:0{pad}d}.png")
+        yield frame_np
+
+
+def _encode_video(output: OutputConfig, frames, out_path: Path, total: int,
+                  preset: FormatPreset, progress: ProgressFn | None,
+                  cancel: CancelFn | None) -> Path:
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    rate = fps_fraction(config.output.fps)
+    rate = fps_fraction(output.fps)
 
     container = av.open(str(out_path), mode="w", format=preset.container)
     try:
         stream = container.add_stream(preset.codec, rate=rate)
-        stream.width = config.output.width
-        stream.height = config.output.height
+        stream.width = output.width
+        stream.height = output.height
         stream.pix_fmt = preset.pix_fmt
-        stream.options = _stream_options(config, preset)
-        if config.output.bitrate:
-            stream.bit_rate = _parse_bitrate(config.output.bitrate)
+        stream.options = _stream_options(output, preset)
+        if output.bitrate:
+            stream.bit_rate = _parse_bitrate(output.bitrate)
 
         for i, frame_np in enumerate(frames):
             if cancel and cancel():
@@ -204,14 +245,14 @@ def _encode_video(config, frames, out_path: Path, total: int, preset: FormatPres
 
 def _encode_sequence(frames: Iterable[np.ndarray], out_dir: Path, total: int,
                      preset: FormatPreset, progress: ProgressFn | None,
-                     cancel: CancelFn | None) -> Path:
+                     cancel: CancelFn | None, start: int = 0) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     ext = "png" if preset.codec == "png" else "tiff"
-    pad = max(4, len(str(total)))
+    pad = frame_file_pad(total, start)
     for i, frame_np in enumerate(frames):
         if cancel and cancel():
             break
-        Image.fromarray(frame_np).save(out_dir / f"frame_{i:0{pad}d}.{ext}")
+        Image.fromarray(frame_np).save(out_dir / f"frame_{start + i:0{pad}d}.{ext}")
         if progress:
             progress(i + 1, total)
     return out_dir
