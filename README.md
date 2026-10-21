@@ -51,6 +51,11 @@ is small, fast, deterministic, pixel-exact, and can composite overlays with plai
 - **Morph branded** — both apps follow the Morph Brand System V2: Morph Black, Studio
   White, Signal Red for motion, Pivot Gold for the one decisive action, and Montserrat,
   which is also used for the text burned into the patterns.
+- **Morph mark on every output** — every frame of every video and PNG carries a small
+  Morph monogram in the bottom-right corner (5% of the frame width). It switches between
+  the white M and the black M to contrast with whatever is behind it, frame by frame. It
+  never covers test content: the burst counters sit above it, and a grid label under it
+  is lifted clear.
 
 ## Format presets
 
@@ -110,8 +115,8 @@ collects them, so every codec above works in the frozen app with no extra binari
 
 The app icon is the Morph app icon, rendered from the brand SVG into
 `src/projgen/assets/` (`icon.ico` for Windows and the runtime window, `icon.icns` for
-macOS). The same folder holds the wordmark, the Montserrat fonts, and the stylesheet's
-arrow images; the spec bundles all of it.
+macOS). The same folder holds the wordmark, the two monograms burned into every output,
+the Montserrat fonts, and the stylesheet's arrow images; the spec bundles all of it.
 
 > **Windows icon cache:** after rebuilding, Explorer may still show the previous icon from
 > its cache. Copy the exe to a new name, or clear the cache
@@ -170,12 +175,12 @@ src/projgen/
 │   ├── config.py      # dataclass settings + JSON presets
 │   ├── color.py       # vectorised HSV -> RGB
 │   ├── pattern.py     # seamless colour-loop frames
-│   ├── overlays.py    # tracking lines, number grid, image/logo
+│   ├── overlays.py    # tracking lines, number grid, image/logo, brand mark
 │   ├── render.py      # composes base pattern + overlays
 │   ├── burst.py       # black & burst sync test
 │   └── encoder.py     # PyAV encoding + format presets
 ├── ui/            # PySide6 GUI (branded header, pages, preview, export bar, theme)
-├── assets/        # app icon, Morph wordmark, Montserrat, UI images
+├── assets/        # app icon, Morph wordmark and monograms, Montserrat, UI images
 ├── cli.py         # headless command line
 └── __main__.py    # GUI with no args, CLI with args
 packaging/         # PyInstaller spec + build script

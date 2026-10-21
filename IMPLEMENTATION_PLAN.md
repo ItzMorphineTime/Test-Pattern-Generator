@@ -20,6 +20,7 @@ burst sync test video (M7).
 | M7 — Black & Burst sync test tool (second tab + `--burst` CLI) | ✅ done |
 | M8 — Black & Burst web app (`black-burst-web/`, GitHub Pages) | ✅ done |
 | M9 — Morph brand applied to both apps | ✅ done |
+| M10 — Adaptive Morph mark on every generated frame (both apps) | ✅ done |
 
 **M6 refinements (from first hands-on review):**
 - **Resizable control panel** — the left sidebar is now a splitter pane (min width, not
@@ -120,14 +121,43 @@ burst sync test video (M7).
   signals and stay unbranded. Only the logo files the apps use are committed; the full
   brand folder (including its PDFs) stays out of the repository.
 
+**M10 — Morph mark on every output (`overlays.BrandMark`, web `layout.markBox`):**
+- **Where** — every frame either app generates (colour loop and black & burst; video,
+  PNG frames, previews, and the web app's MP4, ZIP and single-frame downloads) carries
+  the Morph monogram in the bottom-right corner. It is 5% of the frame width (capped at
+  8% of the height for very wide frames), inset by 3% of the height: 96×71 px with a
+  32 px margin at 1080p, at or above the brand's 32 px minimum from 640 px wide. Sizing
+  is proportional, so previews stay faithful.
+- **Which** — each frame gets the monogram that contrasts with the pixels behind it,
+  by the brand's rule: `morph-monogram-dark` (white M) over dark pixels,
+  `morph-monogram-light` (black M) over light ones. The choice is the mean WCAG relative
+  luminance of the pixels under the mark, switching at 0.179, where black and white
+  contrast equally. On the colour loop it changes as the hues scroll past (black M over
+  red, yellow and green; white M over blue and purple); on black & burst it follows the
+  black and white seconds. The burst renderers measure each of the six
+  background/region combinations once and cache the result.
+- **Non-invasive** — composited last, so nothing covers it, but it never sits on test
+  content. The burst counters are laid out above it. The number grid lifts the label
+  of the cell beneath it just above the mark, but only while the label's centre stays
+  inside that cell, so it still names the right cell. The artwork is shown as supplied:
+  never recoloured, stretched or made translucent.
+- **Verified** — the geometry is identical in Python and JavaScript (tested on both
+  sides). Tests cover the variant choice (black, white, yellow, blue, greys), the variant
+  switching across a scrolling colour loop, and every exported PNG and video frame
+  carrying the contrasting mark. Counters and grid labels are tested to stay clear of it.
+  The web app's MP4 and ZIP exports were decoded with PyAV, and every frame carries the
+  contrasting M.
+
 **Decisions settled during implementation (differ from the first-pass plan):**
 - **Single-file executable** (`--onefile`) per request, not onedir. Trade-off: slightly
   slower first launch (self-extract) for one portable `.exe`.
 - **AV1 uses `libsvtav1`** (fast, present in the PyAV FFmpeg build); `libaom-av1` is not
   compiled in.
-- **No vendored TTF.** Pillow 11's scalable `ImageFont.load_default(size=)` supplies the
-  grid font, so there is no `assets/fonts/` folder and no font-licensing question. A system
-  font family can still be passed as an override.
+- **Fonts** — originally no vendored TTF (Pillow 11's scalable
+  `ImageFont.load_default(size=)` supplied the grid font). Since M9, Montserrat (SIL Open
+  Font License, `OFL.txt` alongside) is bundled in `assets/fonts/` and used for all
+  burned-in text, with Pillow's default as the fallback. A system font family can still
+  be passed as an override.
 - **FFmpeg is not a separate bundled binary** — PyAV already ships the FFmpeg shared
   libraries, and PyInstaller collects them, so codecs work in the frozen app out of the box.
 - Package lives under `src/projgen/`; packaging assets under `packaging/`.
