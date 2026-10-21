@@ -18,16 +18,18 @@ class FrameRenderer:
     """Renders frames for a fixed :class:`ProjectConfig`.
 
     Caches the static grid overlay so its (relatively expensive) text rasterising
-    happens once, not per frame.
+    happens once, not per frame. Every frame carries the Morph brand mark.
     """
 
     def __init__(self, config: ProjectConfig, font_family: str | None = None):
         self.config = config
         self.font_family = font_family
+        width, height = config.output.width, config.output.height
+        self._brand_mark = overlays.BrandMark(width, height)
         self._grid_overlay: np.ndarray | None = None
         if config.grid.enabled:
             self._grid_overlay = overlays.build_grid_overlay(
-                config.grid, config.output.width, config.output.height, font_family
+                config.grid, width, height, font_family, avoid=self._brand_mark.box,
             )
         self._image_overlay: overlays.ImageOverlay | None = None
         if config.image.enabled:
@@ -62,7 +64,7 @@ class FrameRenderer:
 
         if image_layer is not None and cfg.image.above_grid:
             frame = overlays.composite_rgba(frame, image_layer)
-        return frame
+        return self._brand_mark.apply(frame)  # always topmost
 
     def iter_frames(self) -> Iterator[np.ndarray]:
         for i in range(self.config.total_frames()):

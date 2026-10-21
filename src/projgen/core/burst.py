@@ -23,7 +23,7 @@ from PIL import Image, ImageDraw
 from . import encoder
 from .config import BurstConfig
 from .encoder import CancelFn, ProgressFn
-from .overlays import load_font
+from .overlays import BrandMark, load_font
 
 REGION_COLOURS = ((255, 0, 0), (0, 255, 0), (0, 0, 255))
 BLACK = (0, 0, 0)
@@ -88,8 +88,8 @@ def png_frames_dir(cfg: BurstConfig) -> Path | None:
 class BurstRenderer:
     """Renders black & burst frames for a fixed :class:`BurstConfig`.
 
-    The six background/region combinations are drawn once and cached; each frame
-    copies its base and adds the counter text.
+    The six background/region combinations, each carrying the Morph brand mark,
+    are drawn once and cached; each frame copies its base and adds the counters.
     """
 
     def __init__(self, cfg: BurstConfig):
@@ -99,6 +99,7 @@ class BurstRenderer:
         self.fps = cfg.output.fps
         self.total = cfg.total_frames()
         self.boxes = self._layout_regions()
+        self.brand_mark = BrandMark(self.width, self.height)
 
         last = frame_at(self.total - 1, self.fps)
         self._frame_pad = max(4, len(str(last.index + cfg.start_number)))
@@ -134,7 +135,7 @@ class BurstRenderer:
         w, h = self.width, self.height
         margin = max(1, round(0.03 * h))
         area_top = max(box[3] for box in self.boxes) + 1 + margin
-        area_bottom = h - margin
+        area_bottom = self.brand_mark.top - margin  # the counters never reach the mark
         avail = max(1, area_bottom - area_top)
         lines = (("FRAME ", self._frame_pad), ("SECOND ", self._second_pad))
 
@@ -178,6 +179,7 @@ class BurstRenderer:
         if base is None:
             base = Image.new("RGB", (self.width, self.height), WHITE if white else BLACK)
             ImageDraw.Draw(base).rectangle(self.boxes[region], fill=REGION_COLOURS[region])
+            self.brand_mark.paste(base)
             self._bases[key] = base
         return base
 

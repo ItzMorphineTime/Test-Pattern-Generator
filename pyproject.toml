@@ -35,6 +35,7 @@ projgen = [
     "assets/*.ico",
     "assets/*.icns",
     "assets/brand/*.svg",
+    "assets/brand/*.png",
     "assets/fonts/*",
     "assets/ui/*.png",
 ]

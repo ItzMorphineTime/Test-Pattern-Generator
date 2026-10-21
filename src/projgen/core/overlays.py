@@ -1,4 +1,4 @@
-"""Optional overlays composited on top of the base pattern.
+"""Overlays composited on top of the base pattern.
 
 * Tracking / scanning lines — evenly spaced lines that sweep across the frame.
   Motion uses an integer number of sweeps per loop, so it stays seamless.
@@ -6,6 +6,9 @@
   alpha-composited onto every frame.
 * Image / logo — a custom picture positioned and scaled on the canvas, with
   optional seamless effects (grow & shrink, fade, spin).
+* Morph brand mark — the Morph monogram, always present, small in the
+  bottom-right corner of every frame, in whichever variant contrasts
+  with the pixels behind it.
 """
 
 from __future__ import annotations
@@ -159,9 +162,31 @@ def cell_label(mode: LabelMode, row: int, col: int, cols: int,
     return f"{_column_letters(col)}{row + 1}"  # ALPHA_NUM
 
 
+def _overlaps(a, b) -> bool:
+    return a[0] < b[2] and a[2] > b[0] and a[1] < b[3] and a[3] > b[1]
+
+
+def _clear_of(box, label_box, cell_top: float, gap: float) -> float:
+    """Vertical shift that lifts ``label_box`` just above ``box``, or 0.
+
+    Only lifts while the label's centre stays inside its cell, so it still
+    reads as that cell's name; on very dense grids it stays where it is.
+    """
+    if box is None or not _overlaps(label_box, box):
+        return 0.0
+    shift = (box[1] - gap) - label_box[3]
+    centre = (label_box[1] + label_box[3]) / 2
+    return shift if centre + shift >= cell_top else 0.0
+
+
 def build_grid_overlay(cfg: GridConfig, width: int, height: int,
-                       font_family: str | None = None) -> np.ndarray:
-    """Render the (static) grid + labels to an ``(H, W, 4)`` uint8 RGBA array."""
+                       font_family: str | None = None,
+                       avoid: tuple[int, int, int, int] | None = None) -> np.ndarray:
+    """Render the (static) grid + labels to an ``(H, W, 4)`` uint8 RGBA array.
+
+    Labels that ``avoid`` (left, top, right, bottom) would cover are lifted
+    just above it, so the brand mark never hides a cell's name.
+    """
     img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
@@ -185,14 +210,17 @@ def build_grid_overlay(cfg: GridConfig, width: int, height: int,
         font = load_font(size, font_family)
         fc = tuple(int(round(c * 255)) for c in cfg.font_color)
         font_rgba = (*fc, int(round(cfg.label_opacity * 255)))
+        pad = max(2, size // 6) if cfg.cell_background else 0
         for r in range(rows):
             for c in range(cols):
                 text = cell_label(cfg.label_mode, r, c, cols, cell_w, cell_h)
                 cx = (c + 0.5) * cell_w
                 cy = (r + 0.5) * cell_h
+                left, top, right, bottom = draw.textbbox((cx, cy), text, font=font, anchor="mm")
+                label_box = (left - pad, top - pad, right + pad, bottom + pad)
+                cy += _clear_of(avoid, label_box, r * cell_h, gap=max(2, size // 8))
                 if cfg.cell_background:
                     bbox = draw.textbbox((cx, cy), text, font=font, anchor="mm")
-                    pad = max(2, size // 6)
                     draw.rectangle(
                         [bbox[0] - pad, bbox[1] - pad, bbox[2] + pad, bbox[3] + pad],
                         fill=(0, 0, 0, 150),
@@ -333,3 +361,93 @@ class ImageOverlay:
         if opacity < 1.0:
             layer[..., 3] = (layer[..., 3].astype(np.float32) * opacity).astype(np.uint8)
         return layer
+
+
+# ---------------------------------------------------------------------------
+# Morph brand mark
+# ---------------------------------------------------------------------------
+# The brand's own rule: the -dark monogram (white M) on dark backgrounds, the
+# -light one (black M) on light backgrounds.
+MONOGRAMS = {
+    "dark": resource_path("brand", "morph-monogram-dark@2x.png"),
+    "light": resource_path("brand", "morph-monogram-light@2x.png"),
+}
+MONOGRAM_ASPECT = 344 / 466  # artwork height / width
+# Below this WCAG relative luminance, white contrasts more than black.
+LIGHT_THRESHOLD = 0.179
+
+
+@lru_cache(maxsize=2)
+def _monogram(variant: str) -> Image.Image:
+    with Image.open(MONOGRAMS[variant]) as img:
+        return img.convert("RGBA")
+
+
+def brand_mark_box(width: int, height: int) -> tuple[int, int, int, int]:
+    """Where the Morph monogram sits on every frame: ``(left, top, w, h)``.
+
+    Bottom-right, 5% of the frame width (capped at 8% of the height for very
+    wide frames), inset by 3% of the frame height: 96x71 px with a 32 px margin
+    at 1080p, above the brand's 32 px minimum from 640 px wide. Sizing is
+    proportional, so previews stay faithful.
+    """
+    w = 0.05 * width
+    h = w * MONOGRAM_ASPECT
+    if h > 0.08 * height:
+        h = 0.08 * height
+        w = h / MONOGRAM_ASPECT
+    w, h = max(1, round(w)), max(1, round(h))
+    margin = max(1, round(0.03 * height))
+    return width - margin - w, height - margin - h, w, h
+
+
+def relative_luminance(rgb: np.ndarray) -> float:
+    """Mean WCAG relative luminance of sRGB uint8 pixels: 0 black, 1 white."""
+    c = rgb.reshape(-1, 3).astype(np.float32) / 255.0
+    linear = np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+    return float((linear @ np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)).mean())
+
+
+def mark_variant(luminance: float) -> str:
+    """Which monogram contrasts with a background of this luminance."""
+    return "light" if luminance > LIGHT_THRESHOLD else "dark"
+
+
+class BrandMark:
+    """The Morph monogram, small in the bottom-right corner of every frame.
+
+    Each frame gets the variant that contrasts with the pixels behind it: the
+    dark-background monogram (white M) over dark pixels, the light one (black
+    M) over light pixels. Shown as supplied: never recoloured, stretched or
+    made translucent.
+    """
+
+    def __init__(self, width: int, height: int):
+        self.left, self.top, w, h = brand_mark_box(width, height)
+        self.box = (self.left, self.top, self.left + w, self.top + h)  # right/bottom exclusive
+        self.images = {v: _monogram(v).resize((w, h), Image.LANCZOS) for v in MONOGRAMS}
+        self._layers = {}
+        for variant, image in self.images.items():
+            rgba = np.asarray(image, dtype=np.float32)
+            self._layers[variant] = (rgba[..., 3:4] / 255.0, rgba[..., :3])
+
+    def variant_for(self, pixels: np.ndarray) -> str:
+        """The variant for a frame, judged from the pixels behind the mark."""
+        left, top, right, bottom = self.box
+        return mark_variant(relative_luminance(pixels[top:bottom, left:right]))
+
+    def apply(self, frame: np.ndarray) -> np.ndarray:
+        """Composite onto an ``(H, W, 3)`` uint8 frame, in place if it's writable."""
+        if not frame.flags.writeable:
+            frame = frame.copy()
+        alpha, rgb = self._layers[self.variant_for(frame)]
+        left, top, right, bottom = self.box
+        region = frame[top:bottom, left:right]
+        blended = region * (1.0 - alpha) + rgb * alpha
+        region[...] = np.clip(np.rint(blended), 0, 255).astype(np.uint8)
+        return frame
+
+    def paste(self, image: Image.Image) -> None:
+        """Paste onto an RGB PIL image, in place."""
+        mark = self.images[self.variant_for(np.asarray(image))]
+        image.paste(mark, (self.left, self.top), mark)
