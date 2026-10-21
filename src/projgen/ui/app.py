@@ -1,15 +1,12 @@
-"""Main application window."""
+"""Main application window: one tab per generator, sharing presets and theme."""
 
 from __future__ import annotations
 
 import copy
-import os
-import subprocess
 import sys
 from enum import Enum
-from pathlib import Path
 
-from PySide6.QtCore import Qt, QThread, QTimer
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QApplication,
@@ -23,11 +20,8 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMainWindow,
     QMessageBox,
-    QProgressBar,
     QPushButton,
-    QScrollArea,
-    QSplitter,
-    QVBoxLayout,
+    QTabWidget,
     QWidget,
 )
 
@@ -42,12 +36,20 @@ from ..core.config import (
 )
 from ..core.render import FrameRenderer
 from ..resources import icon_path
-from .preview import PreviewWidget
-from .render_worker import RenderWorker
+from .burst_page import BurstPage
+from .export_bar import ExportBar
+from .preview import PREVIEW_MAX, PreviewWidget
+from .render_worker import ExportJob
 from .style import DARK_QSS
-from .widgets import ColorButton, float_spin, int_spin
-
-PREVIEW_MAX = 720  # longest preview edge in px, for responsiveness
+from .widgets import (
+    ColorButton,
+    OutputGroup,
+    control_panel,
+    float_spin,
+    int_spin,
+    row,
+    split_page,
+)
 
 
 class MainWindow(QMainWindow):
@@ -56,37 +58,29 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Projection Test-Pattern Generator")
         if icon_path():
             self.setWindowIcon(QIcon(icon_path()))
-        self.resize(1460, 820)
+        self.resize(1460, 860)
         self.config = ProjectConfig()
-        self._worker: RenderWorker | None = None
-        self._thread: QThread | None = None
 
         self.preview = PreviewWidget()
+        self.export_bar = ExportBar(
+            self.config.output.output_path,
+            get_preset=lambda: encoder.get_preset(self.config),
+            validate=lambda: encoder.validate(self.config),
+            make_job=self._make_job,
+        )
+        self.export_bar.path_edited.connect(
+            lambda text: self._set("output.output_path", text, False))
+        loop_page, self._scroll = split_page(self._build_controls(), self.preview,
+                                             self.export_bar)
+        self.burst_page = BurstPage(self.config.burst)
 
-        controls = self._build_controls()
-        self._scroll = QScrollArea()
-        self._scroll.setWidgetResizable(True)
-        self._scroll.setWidget(controls)
-        self._scroll.setMinimumWidth(420)
-        self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self._scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-
-        right = QWidget()
-        right.setMinimumWidth(420)
-        right_layout = QVBoxLayout(right)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.addWidget(self.preview, 1)
-        right_layout.addWidget(self._build_export_bar())
-
-        splitter = QSplitter()
-        splitter.addWidget(self._scroll)
-        splitter.addWidget(right)
-        splitter.setStretchFactor(0, 0)
-        splitter.setStretchFactor(1, 1)
-        splitter.setCollapsible(0, False)
-        splitter.setChildrenCollapsible(False)
-        splitter.setSizes([660, 800])
-        self.setCentralWidget(splitter)
+        self.tabs = QTabWidget()
+        self.tabs.setDocumentMode(True)
+        self.tabs.addTab(loop_page, "Colour Loop")
+        self.tabs.addTab(self.burst_page, "Black && Burst")
+        self.tabs.setCornerWidget(self._build_preset_buttons(), Qt.TopRightCorner)
+        self.tabs.currentChanged.connect(self._on_tab_changed)
+        self.setCentralWidget(self.tabs)
         self.statusBar().showMessage("Ready")
 
         self._refresh_timer = QTimer(self)
@@ -100,58 +94,17 @@ class MainWindow(QMainWindow):
     # Control panel construction
     # ------------------------------------------------------------------
     def _build_controls(self) -> QWidget:
-        panel = QWidget()
-        panel.setObjectName("controlPanel")
-        layout = QVBoxLayout(panel)
-        # Extra right margin keeps fields clear of the vertical scrollbar.
-        layout.setContentsMargins(12, 12, 18, 12)
-        layout.setSpacing(12)
-
-        layout.addWidget(self._build_output_group())
+        panel, layout = control_panel()
+        self.output_group = OutputGroup(self.config.output)
+        self.output_group.changed.connect(self._on_output_changed)
+        layout.addWidget(self.output_group)
         layout.addWidget(self._build_color_group())
         layout.addWidget(self._build_line_group("Horizontal Lines", self.config.h_lines, "h"))
         layout.addWidget(self._build_line_group("Vertical Lines", self.config.v_lines, "v"))
         layout.addWidget(self._build_grid_group())
         layout.addWidget(self._build_image_group())
-        layout.addWidget(self._build_preset_buttons())
         layout.addStretch(1)
         return panel
-
-    def _build_output_group(self) -> QGroupBox:
-        box = QGroupBox("Output")
-        form = QFormLayout(box)
-        o = self.config.output
-
-        self.w_width = int_spin(2, 65536, o.width, 2, " px")
-        self.w_height = int_spin(2, 65536, o.height, 2, " px")
-        self.w_fps = float_spin(1.0, 240.0, o.fps, 1.0, 3, " fps")
-        self.w_duration = float_spin(0.1, 3600.0, o.duration, 0.5, 2, " s")
-        self.w_preset = QComboBox()
-        for key, preset in sorted(encoder.FORMAT_PRESETS.items()):
-            self.w_preset.addItem(preset.label, key)
-        self.w_preset.setCurrentIndex(self.w_preset.findData(o.preset))
-
-        self.w_width.valueChanged.connect(lambda v: self._set("output.width", v))
-        self.w_height.valueChanged.connect(lambda v: self._set("output.height", v))
-        self.w_fps.valueChanged.connect(lambda v: self._set("output.fps", v))
-        self.w_duration.valueChanged.connect(lambda v: self._set("output.duration", v))
-        self.w_preset.currentIndexChanged.connect(self._on_preset_changed)
-
-        size_row = QHBoxLayout()
-        size_row.addWidget(self.w_width)
-        size_row.addWidget(QLabel("x"))
-        size_row.addWidget(self.w_height)
-        size_wrap = QWidget()
-        size_wrap.setLayout(size_row)
-        size_row.setContentsMargins(0, 0, 0, 0)
-
-        form.addRow("Resolution", size_wrap)
-        form.addRow("Frame rate", self.w_fps)
-        form.addRow("Duration", self.w_duration)
-        form.addRow("Format", self.w_preset)
-        self.frames_label = QLabel()
-        form.addRow("Frames", self.frames_label)
-        return box
 
     def _build_color_group(self) -> QGroupBox:
         box = QGroupBox("Colour Loop")
@@ -388,47 +341,15 @@ class MainWindow(QMainWindow):
             self.w_image_path.setText(path)
 
     def _build_preset_buttons(self) -> QWidget:
-        wrap = QWidget()
-        row = QHBoxLayout(wrap)
-        row.setContentsMargins(0, 0, 0, 0)
-        save = QPushButton("Save Preset...")
         load = QPushButton("Load Preset...")
-        save.clicked.connect(self._save_preset)
+        save = QPushButton("Save Preset...")
+        load.setToolTip("Load the settings for every tab from a preset file.")
+        save.setToolTip("Save the settings of every tab to a preset file.")
         load.clicked.connect(self._load_preset)
-        row.addWidget(load)
-        row.addWidget(save)
-        return wrap
-
-    def _build_export_bar(self) -> QWidget:
-        bar = QWidget()
-        layout = QVBoxLayout(bar)
-        layout.setContentsMargins(8, 8, 8, 8)
-
-        path_row = QHBoxLayout()
-        self.w_path = QLineEdit(self.config.output.output_path)
-        self.w_path.textChanged.connect(lambda t: self._set("output.output_path", t, False))
-        browse = QPushButton("Browse...")
-        browse.clicked.connect(self._browse_output)
-        path_row.addWidget(QLabel("Output"))
-        path_row.addWidget(self.w_path, 1)
-        path_row.addWidget(browse)
-        layout.addLayout(path_row)
-
-        action_row = QHBoxLayout()
-        self.progress = QProgressBar()
-        self.progress.setValue(0)
-        self.export_btn = QPushButton("Export Video")
-        self.export_btn.setObjectName("primary")
-        self.export_btn.clicked.connect(self._start_export)
-        self.cancel_btn = QPushButton("Cancel")
-        self.cancel_btn.setObjectName("danger")
-        self.cancel_btn.clicked.connect(self._cancel_export)
-        self.cancel_btn.hide()
-        action_row.addWidget(self.progress, 1)
-        action_row.addWidget(self.cancel_btn)
-        action_row.addWidget(self.export_btn)
-        layout.addLayout(action_row)
-        return bar
+        save.clicked.connect(self._save_preset)
+        corner = row(load, save)
+        corner.layout().setContentsMargins(0, 4, 8, 4)
+        return corner
 
     # ------------------------------------------------------------------
     # State plumbing
@@ -454,11 +375,11 @@ class MainWindow(QMainWindow):
         # extra needed, but keep the hook for future dependent-field logic.
         pass
 
-    def _on_preset_changed(self, _index: int) -> None:
-        self.config.output.preset = self.w_preset.currentData()
-        self.statusBar().showMessage(
-            f"Format: {encoder.get_preset(self.config).label}", 4000)
-        self._update_frames_label()
+    def _on_output_changed(self, attr: str, value) -> None:
+        self._set(f"output.{attr}", value)
+        if attr == "preset":
+            self.statusBar().showMessage(
+                f"Format: {encoder.get_preset(self.config).label}", 4000)
 
     def _update_frames_label(self) -> None:
         n = self.config.total_frames()
@@ -467,7 +388,7 @@ class MainWindow(QMainWindow):
         if preset.requires_even and (self.config.output.width % 2
                                      or self.config.output.height % 2):
             warn = "  ⚠ needs even size"
-        self.frames_label.setText(f"{n:,} frames · one seamless loop{warn}")
+        self.output_group.frames_label.setText(f"{n:,} frames · one seamless loop{warn}")
 
     def _rebuild_preview(self) -> None:
         self._update_frames_label()
@@ -518,92 +439,36 @@ class MainWindow(QMainWindow):
     def _reload_widgets_from_config(self) -> None:
         # Simplest robust approach: rebuild the whole control panel.
         self._scroll.setWidget(self._build_controls())
-        self.w_path.setText(self.config.output.output_path)
+        self.export_bar.set_path(self.config.output.output_path)
+        self.burst_page.set_config(self.config.burst)
         self._sync_enabled_states()
         self._rebuild_preview()
 
     # ------------------------------------------------------------------
-    # Export
+    # Export and window lifecycle
     # ------------------------------------------------------------------
-    def _browse_output(self) -> None:
-        preset = encoder.get_preset(self.config)
-        if preset.is_sequence:
-            path = QFileDialog.getExistingDirectory(self, "Choose output folder")
-            if path:
-                self.w_path.setText(os.path.join(path, "frame"))
-        else:
-            path, _ = QFileDialog.getSaveFileName(
-                self, "Export as", self.config.output.output_path,
-                f"Video (*{preset.extension})")
-            if path:
-                self.w_path.setText(path)
+    def _make_job(self) -> ExportJob:
+        cfg = copy.deepcopy(self.config)
+        return lambda progress, cancel: encoder.encode(cfg, progress=progress,
+                                                       cancel=cancel)
 
-    def _start_export(self) -> None:
-        problems = encoder.validate(self.config)
-        if problems:
-            QMessageBox.warning(self, "Cannot export", "\n".join(problems))
-            return
+    def _on_tab_changed(self, _index: int) -> None:
+        # Only the visible tab's preview should spend time rendering.
+        self.preview.pause()
+        self.burst_page.preview.pause()
 
-        self._worker = RenderWorker(self.config)
-        self._thread = QThread()
-        self._worker.moveToThread(self._thread)
-        self._thread.started.connect(self._worker.run)
-        self._worker.progress.connect(self._on_progress)
-        self._worker.finished.connect(self._on_finished)
-        self._worker.failed.connect(self._on_failed)
-
-        self.export_btn.setEnabled(False)
-        self.cancel_btn.show()
-        self.progress.setValue(0)
-        self.statusBar().showMessage("Exporting...")
-        self._thread.start()
-
-    def _cancel_export(self) -> None:
-        if self._worker is not None:
-            self._worker.cancel()
-            self.statusBar().showMessage("Cancelling...")
-
-    def _on_progress(self, done: int, total: int) -> None:
-        self.progress.setMaximum(total)
-        self.progress.setValue(done)
-
-    def _on_finished(self, path: str) -> None:
-        self._teardown_thread()
-        self.statusBar().showMessage(f"Exported {path}", 8000)
-        result = QMessageBox.information(
-            self, "Export complete", f"Saved to:\n{path}",
-            QMessageBox.Open | QMessageBox.Ok)
-        if result == QMessageBox.Open:
-            self._open_in_explorer(path)
-
-    def _on_failed(self, message: str) -> None:
-        self._teardown_thread()
-        self.progress.setValue(0)
-        self.statusBar().showMessage(message, 6000)
-        if message != "Export cancelled.":
-            QMessageBox.critical(self, "Export failed", message)
-
-    def _teardown_thread(self) -> None:
-        if self._thread is not None:
-            self._thread.quit()
-            self._thread.wait()
-        self._thread = None
-        self._worker = None
-        self.export_btn.setEnabled(True)
-        self.cancel_btn.hide()
-
-    @staticmethod
-    def _open_in_explorer(path: str) -> None:
-        target = os.path.dirname(path) or "."
-        try:
-            if sys.platform == "win32":
-                os.startfile(target)  # noqa: S606
-            elif sys.platform == "darwin":
-                subprocess.run(["open", target], check=False)
-            else:
-                subprocess.run(["xdg-open", target], check=False)
-        except OSError:
-            pass
+    def closeEvent(self, event) -> None:  # noqa: N802 - Qt override
+        bars = (self.export_bar, self.burst_page.export_bar)
+        if any(bar.busy for bar in bars):
+            answer = QMessageBox.question(
+                self, "Export running",
+                "An export is still running. Cancel it and quit?")
+            if answer != QMessageBox.Yes:
+                event.ignore()
+                return
+        for bar in bars:
+            bar.shutdown()
+        super().closeEvent(event)
 
 
 def run() -> int:

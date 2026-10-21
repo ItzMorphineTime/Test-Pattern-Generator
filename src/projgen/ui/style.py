@@ -19,8 +19,30 @@ QGroupBox::title {
     color: #8ea0b6;
 }
 QGroupBox::indicator { width: 16px; height: 16px; }
+/* Only the unchecked state is restyled, so checked boxes keep the native tick;
+   without an outline an empty box vanishes into the dark background. */
+QCheckBox::indicator:unchecked, QGroupBox::indicator:unchecked {
+    border: 1px solid #6b7588;
+    border-radius: 3px;
+    background: #262b33;
+}
+QCheckBox:disabled { color: #5d6675; }
 
 QLabel { background: transparent; }
+QLabel#hint { color: #8ea0b6; padding: 0 2px; }
+
+QTabWidget::pane { border: 0; border-top: 1px solid #333842; }
+QTabBar { background: #171a1f; }
+QTabBar::tab {
+    background: #171a1f;
+    color: #8ea0b6;
+    padding: 9px 22px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    font-weight: 600;
+}
+QTabBar::tab:selected { color: #d7dae0; border-bottom: 2px solid #4c8bf5; }
+QTabBar::tab:hover:!selected { color: #d7dae0; background: #20242b; }
 
 QSpinBox, QDoubleSpinBox, QComboBox, QLineEdit {
     background-color: #262b33;

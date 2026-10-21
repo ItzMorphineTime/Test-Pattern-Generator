@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..core.render import FrameRenderer
+PREVIEW_MAX = 720  # longest preview edge in px, for responsiveness
 
 
 def numpy_to_qimage(frame: np.ndarray) -> QImage:
@@ -32,7 +32,7 @@ class PreviewWidget(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._renderer: FrameRenderer | None = None
+        self._renderer = None  # anything with render(index) -> (H, W, 3) uint8
         self._total = 1
         self._index = 0
         self._playing = False
@@ -68,7 +68,7 @@ class PreviewWidget(QWidget):
         self._timer.timeout.connect(self._advance)
 
     # -- public API ------------------------------------------------------
-    def set_renderer(self, renderer: FrameRenderer, total: int, fps: float = 25.0) -> None:
+    def set_renderer(self, renderer, total: int, fps: float = 25.0) -> None:
         self._renderer = renderer
         self._total = max(1, total)
         self._fps = max(1.0, min(60.0, fps))
@@ -88,6 +88,10 @@ class PreviewWidget(QWidget):
             self._timer.start(int(1000 / getattr(self, "_fps", 25.0)))
         else:
             self._timer.stop()
+
+    def pause(self) -> None:
+        if self._playing:
+            self.toggle_play()
 
     # -- internals -------------------------------------------------------
     def _advance(self) -> None:
