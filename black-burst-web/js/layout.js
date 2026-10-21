@@ -54,30 +54,30 @@ export function counterLabels(frame, startNumber, pads) {
  * Size the two counter lines to fit below the regions and fix their positions.
  *
  * `measure(text, size)` returns `{width, ascent, descent}` for the font at
- * `size` px. Each line is left-anchored where its widest possible label would
- * be centred, so the text never shifts as the numbers change. Positions are
- * the vertical middle of each line.
+ * `size` px. Digits are drawn one per fixed-width cell (the width of the
+ * widest digit), because the brand font's figures are proportional; with
+ * constant-width lines centred once, the counters never shift as the numbers
+ * change. Each line's `y` is its vertical middle.
  */
 export function counterLayout({ width, height, textSize, boxes, pads, measure }) {
   const margin = Math.max(1, roundHalfEven(0.03 * height));
   const areaTop = Math.max(...boxes.map((box) => box[3])) + 1 + margin;
   const areaBottom = height - margin;
   const avail = Math.max(1, areaBottom - areaTop);
-  const widestFrame = 'FRAME ' + '8'.repeat(pads.framePad);
-  const widestSecond = 'SECOND ' + '8'.repeat(pads.secondPad);
+  const lines = [['FRAME ', pads.framePad], ['SECOND ', pads.secondPad]];
 
   const metrics = (size) => {
-    const f = measure(widestFrame, size);
-    const s = measure(widestSecond, size);
-    const lineH = f.ascent + f.descent;
-    return { frameW: f.width, secondW: s.width, lineH, lineGap: roundHalfEven(0.25 * lineH) };
+    const digitWidth = Math.max(...[...'0123456789'].map((d) => measure(d, size).width));
+    const prefixes = lines.map(([prefix]) => measure(prefix, size));
+    const lineH = prefixes[0].ascent + prefixes[0].descent;
+    const widths = lines.map(([, pad], i) => prefixes[i].width + pad * digitWidth);
+    return { digitWidth, prefixes, widths, lineH, lineGap: roundHalfEven(0.25 * lineH) };
   };
 
   let size = Math.max(6, roundHalfEven(textSize * height));
   for (let i = 0; i < 4; i++) {
     const m = metrics(size);
-    const widest = Math.max(m.frameW, m.secondW);
-    const scale = Math.min(1, (0.9 * width) / Math.max(1, widest),
+    const scale = Math.min(1, (0.9 * width) / Math.max(1, ...m.widths),
       (0.9 * avail) / Math.max(1, 2 * m.lineH + m.lineGap));
     if (scale >= 0.99 || size <= 6) break;
     size = Math.max(6, Math.floor(size * scale));
@@ -88,7 +88,14 @@ export function counterLayout({ width, height, textSize, boxes, pads, measure })
   const offset = (m.lineH + m.lineGap) / 2;
   return {
     fontSize: size,
-    frame: { x: (width - m.frameW) / 2, y: centreY - offset },
-    second: { x: (width - m.secondW) / 2, y: centreY + offset },
+    digitWidth: m.digitWidth,
+    lines: lines.map(([prefix, pad], i) => ({
+      prefix,
+      pad,
+      x: (width - m.widths[i]) / 2,
+      y: i === 0 ? centreY - offset : centreY + offset,
+      prefixWidth: m.prefixes[i].width,
+      width: m.widths[i],
+    })),
   };
 }

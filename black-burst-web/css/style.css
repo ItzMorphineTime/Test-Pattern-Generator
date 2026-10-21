@@ -1,0 +1,442 @@
+/*
+ * Morph Brand System V2. Colour tokens follow the brand's colour guidelines:
+ * light mode by default, dark mode when the visitor's system prefers it.
+ * Signal Red carries motion (progress, focus, the scrubber, accent rules);
+ * Pivot Gold marks the one decisive action (the MP4 download). States the
+ * brand doesn't define (hover, dark-mode borders) use tints of brand colours.
+ */
+
+@font-face {
+  font-family: "Montserrat";
+  src: url("../assets/fonts/montserrat-latin-variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* Primitives: alias targets only. */
+  --morph-black-950: #0A0A0A;
+  --morph-red-600: #C51622;
+  --morph-white-1000: #FFFFFF;
+  --morph-gold-500: #F2B705;
+  --morph-neutral-50: #F7F7F5;
+  --morph-neutral-600: #6C6C6C;
+  --morph-neutral-200: #D4D4D4;
+
+  /* Semantic tokens, light mode. */
+  --color-background: var(--morph-white-1000);
+  --color-surface: var(--morph-neutral-50);
+  --color-text: var(--morph-black-950);
+  --color-text-secondary: var(--morph-neutral-600);
+  --color-border: var(--morph-neutral-200);
+  --color-accent-red: var(--morph-red-600);
+  --color-accent-gold: var(--morph-gold-500);
+
+  /* Interface roles. */
+  --field: var(--morph-white-1000);
+  --field-border: var(--morph-neutral-600); /* 5.25:1, clear for controls */
+  --button-border: var(--morph-black-950);
+  --hover: rgba(10, 10, 10, 0.05);
+  --eyebrow: var(--color-accent-red); /* red text is AA on white */
+  --gold-hover: #F4C22A; /* Pivot Gold with a 15% Studio White tint */
+  --stage: var(--morph-black-950);
+
+  color-scheme: light dark;
+  font-family: "Montserrat", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-background: var(--morph-black-950);
+    --color-surface: var(--morph-black-950);
+    --color-text: var(--morph-white-1000);
+    --color-text-secondary: rgba(255, 255, 255, 0.72);
+    --color-border: rgba(255, 255, 255, 0.16);
+    --field: rgba(255, 255, 255, 0.05);
+    --field-border: rgba(255, 255, 255, 0.45);
+    --button-border: rgba(255, 255, 255, 0.55);
+    --hover: rgba(255, 255, 255, 0.08);
+    /* Signal Red on Morph Black is 3.31:1: graphics and large text only. */
+    --eyebrow: var(--morph-white-1000);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-background);
+  color: var(--color-text);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent-red);
+  outline-offset: 2px;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--eyebrow);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* -- header & footer -------------------------------------------------- */
+.site-header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 24px 32px; /* the brand's clear space around the wordmark */
+  border-bottom: 1px solid var(--color-border);
+}
+
+.wordmark {
+  display: block;
+  width: 132px; /* above the wordmark's 120 px minimum */
+  height: auto;
+}
+
+.header-divider {
+  align-self: stretch;
+  width: 1px;
+  background: var(--color-border);
+}
+
+.product {
+  flex: 1;
+  min-width: 200px;
+}
+
+h1 {
+  margin: 2px 0 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.site-footer {
+  padding: 18px 32px 28px;
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.site-footer p {
+  max-width: 72ch;
+  margin: 0 auto 4px;
+}
+
+/* -- layout ------------------------------------------------------------ */
+.layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "settings preview"
+    "settings downloads";
+  align-items: start;
+  gap: 20px;
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 24px 32px 8px;
+}
+
+.settings { grid-area: settings; }
+.preview-panel { grid-area: preview; }
+.downloads { grid-area: downloads; }
+
+@media (max-width: 880px) {
+  .site-header { padding: 20px; }
+  .header-divider { display: none; }
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-template-areas: "preview" "settings" "downloads";
+    padding: 16px;
+  }
+}
+
+.panel {
+  padding: 20px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+/* -- settings ---------------------------------------------------------- */
+.intro {
+  margin: 0 0 20px;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+
+fieldset {
+  min-width: 0;
+  margin: 0 0 20px;
+  padding: 0;
+  border: 0;
+}
+
+legend {
+  margin-bottom: 12px;
+  padding: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  color: var(--color-text-secondary);
+  font-size: 0.84rem;
+  font-weight: 500;
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.input-unit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.input-unit > span {
+  min-width: 1.8em;
+  color: var(--color-text-secondary);
+}
+
+input,
+select {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 7px 10px;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 500;
+  background: var(--field);
+  border: 1px solid var(--field-border);
+  border-radius: 8px;
+}
+
+input:hover,
+select:hover {
+  border-color: var(--color-text);
+}
+
+input[type="range"] {
+  min-height: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  accent-color: var(--color-accent-red);
+}
+
+.hint {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+}
+
+.summary {
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent-red);
+  border-radius: 8px;
+  font-size: 0.86rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.problems {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.86rem;
+}
+
+.problems li {
+  margin-top: 6px;
+  padding-left: 10px;
+  border-left: 3px solid var(--color-accent-red);
+}
+
+.problems li.note {
+  color: var(--color-text-secondary);
+  border-left-color: var(--color-border);
+}
+
+/* -- preview ----------------------------------------------------------- */
+.stage {
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  background: var(--stage);
+  border-radius: 10px;
+}
+
+.stage canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 64vh;
+  object-fit: contain;
+}
+
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.transport input[type="range"] {
+  flex: 1;
+}
+
+#readout {
+  min-width: 8.5em;
+  color: var(--color-text-secondary);
+  font-size: 0.86rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Narrow screens: the scrubber gets a full-width row of its own. */
+@media (max-width: 880px) {
+  .transport { flex-wrap: wrap; }
+  .transport input[type="range"] { order: 3; flex: 1 1 100%; }
+  #readout { flex: 1; }
+}
+
+/* -- downloads -------------------------------------------------------- */
+.downloads-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+h2 {
+  margin: 2px 0 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.field.inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+
+.field.inline select {
+  width: auto;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+}
+
+.note {
+  min-height: 1.3em;
+  margin: 12px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.84rem;
+}
+
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+progress {
+  flex: 1;
+  height: 8px;
+  accent-color: var(--color-accent-red);
+}
+
+.progress-text {
+  min-width: 7em;
+  color: var(--color-text-secondary);
+  font-size: 0.84rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.status {
+  min-height: 1.4em;
+  margin: 12px 0 0;
+  font-size: 0.9rem;
+}
+
+.status.error {
+  padding-left: 10px;
+  border-left: 3px solid var(--color-accent-red);
+}
+
+/* -- buttons ------------------------------------------------------------ */
+button {
+  min-height: 42px;
+  padding: 9px 18px;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid var(--button-border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) { background: var(--hover); }
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* Pivot Gold: one decisive action per layout (Morph Black on gold is 10.89:1). */
+button.primary {
+  color: var(--morph-black-950);
+  background: var(--color-accent-gold);
+  border-color: var(--color-accent-gold);
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--gold-hover);
+  border-color: var(--gold-hover);
+}
+
+#play { min-width: 5.5em; }

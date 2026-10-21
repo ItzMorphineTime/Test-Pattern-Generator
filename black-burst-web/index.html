@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Black &amp; Burst · Morph</title>
+  <meta name="description" content="Make a black &amp; burst sync test video or PNG frames in your browser: alternating black and white seconds, cycling red, green and blue regions, and frame and second counters.">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0A0A0A" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="assets/brand/morph-favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="assets/brand/morph-favicon.png" type="image/png" sizes="64x64">
+  <link rel="apple-touch-icon" href="assets/brand/morph-app-icon-dark@2x.png">
+  <link rel="preload" href="assets/fonts/montserrat-latin-variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <picture>
+      <source srcset="assets/brand/morph-wordmark-dark.svg" media="(prefers-color-scheme: dark)">
+      <img class="wordmark" src="assets/brand/morph-wordmark-light.svg" alt="Morph" width="132" height="38">
+    </picture>
+    <span class="header-divider" aria-hidden="true"></span>
+    <div class="product">
+      <p class="eyebrow">Sync test generator</p>
+      <h1>Black &amp; Burst</h1>
+    </div>
+    <button id="copy-link" type="button">Copy link to these settings</button>
+  </header>
+
+  <main class="layout">
+    <form id="settings" class="panel settings" novalidate>
+      <p class="intro">
+        The background flips between black and white every second. Red, green and blue
+        regions each show for a third of the second, and every frame shows its frame and
+        second number.
+      </p>
+
+      <fieldset>
+        <legend class="eyebrow">Output</legend>
+        <label class="field">
+          <span>Resolution</span>
+          <select id="resolution-preset">
+            <option value="1280x720">1280 × 720 (HD)</option>
+            <option value="1920x1080">1920 × 1080 (Full HD)</option>
+            <option value="2560x1440">2560 × 1440 (QHD)</option>
+            <option value="3840x2160">3840 × 2160 (4K UHD)</option>
+            <option value="4096x2160">4096 × 2160 (DCI 4K)</option>
+            <option value="custom">Custom</option>
+          </select>
+        </label>
+        <div class="pair">
+          <label class="field">
+            <span>Width</span>
+            <span class="input-unit"><input id="width" type="number" min="16" max="8192" step="2" inputmode="numeric"><span>px</span></span>
+          </label>
+          <label class="field">
+            <span>Height</span>
+            <span class="input-unit"><input id="height" type="number" min="16" max="8192" step="2" inputmode="numeric"><span>px</span></span>
+          </label>
+        </div>
+        <div class="pair">
+          <label class="field">
+            <span>Frame rate</span>
+            <span class="input-unit"><input id="fps" type="number" min="1" max="240" step="any" list="fps-rates" inputmode="decimal"><span>fps</span></span>
+          </label>
+          <label class="field">
+            <span>Duration</span>
+            <span class="input-unit"><input id="duration" type="number" min="0.1" max="3600" step="any" inputmode="decimal"><span>s</span></span>
+          </label>
+        </div>
+        <datalist id="fps-rates">
+          <option value="23.976"></option>
+          <option value="24"></option>
+          <option value="25"></option>
+          <option value="29.97"></option>
+          <option value="30"></option>
+          <option value="50"></option>
+          <option value="59.94"></option>
+          <option value="60"></option>
+        </datalist>
+      </fieldset>
+
+      <fieldset>
+        <legend class="eyebrow">Pattern</legend>
+        <div class="pair">
+          <label class="field">
+            <span>Region height</span>
+            <span class="input-unit"><input id="region-height" type="number" min="5" max="60" step="1" inputmode="decimal"><span>%</span></span>
+          </label>
+          <label class="field">
+            <span>Region spacing</span>
+            <span class="input-unit"><input id="region-gap" type="number" min="0" max="20" step="0.5" inputmode="decimal"><span>%</span></span>
+          </label>
+        </div>
+        <div class="pair">
+          <label class="field">
+            <span>Counter size</span>
+            <span class="input-unit"><input id="text-size" type="number" min="2" max="40" step="1" inputmode="decimal"><span>%</span></span>
+          </label>
+          <label class="field">
+            <span>Numbering</span>
+            <select id="start-number">
+              <option value="0">From 0 (timecode)</option>
+              <option value="1">From 1</option>
+            </select>
+          </label>
+        </div>
+        <p class="hint">Region height and counter size are percentages of the canvas height; spacing is a percentage of its width.</p>
+      </fieldset>
+
+      <p id="summary" class="summary"></p>
+      <ul id="problems" class="problems" role="alert"></ul>
+    </form>
+
+    <section class="panel preview-panel" aria-label="Preview">
+      <div class="stage">
+        <canvas id="preview" role="img" aria-label="Preview of the selected frame"></canvas>
+      </div>
+      <div class="transport">
+        <button id="play" type="button" aria-pressed="false">Play</button>
+        <input id="scrub" type="range" min="0" max="0" value="0" aria-label="Frame">
+        <output id="readout" for="scrub"></output>
+      </div>
+      <p class="hint">Space plays and pauses; the arrow keys step through frames. The preview flashes between black and white once a second.</p>
+    </section>
+
+    <section class="panel downloads" aria-labelledby="downloads-title">
+      <div class="downloads-head">
+        <div>
+          <p class="eyebrow">Export</p>
+          <h2 id="downloads-title">Download</h2>
+        </div>
+        <label class="field inline">
+          <span>Video quality</span>
+          <select id="quality">
+            <option value="standard">Standard</option>
+            <option value="high" selected>High</option>
+            <option value="maximum">Maximum</option>
+          </select>
+        </label>
+      </div>
+      <div class="actions">
+        <button id="download-mp4" type="button" class="primary">Download MP4 video</button>
+        <button id="download-zip" type="button">Download PNG frames (.zip)</button>
+        <button id="save-folder" type="button" hidden>Save PNG frames to a folder…</button>
+        <button id="download-frame" type="button">Download this frame (PNG)</button>
+      </div>
+      <p id="video-note" class="note"></p>
+      <div id="progress-row" class="progress-row" hidden>
+        <progress id="progress" max="1" value="0" aria-label="Export progress"></progress>
+        <span id="progress-text" class="progress-text"></span>
+        <button id="cancel" type="button">Cancel</button>
+      </div>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Everything runs in your browser; nothing is uploaded. Video export uses WebCodecs H.264 (current Chrome, Edge and Safari); PNG frames work in any modern browser.</p>
+    <p>Morph · Interactive media, engineered for live environments.</p>
+  </footer>
+</body>
+</html>

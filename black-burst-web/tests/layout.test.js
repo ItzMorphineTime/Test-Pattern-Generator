@@ -29,12 +29,32 @@ test('counters fit inside the canvas, below the regions', () => {
     const boxes = regionBoxes(width, height, 0.25, 0.04);
     const pads = { framePad: 4, secondPad: 2 };
     const layout = counterLayout({ width, height, textSize, boxes, pads, measure });
-    const frameWidth = measure('FRAME 8888', layout.fontSize).width;
+    const [frameLine, secondLine] = layout.lines;
     const lineHeight = 1.2 * layout.fontSize;
-    assert.ok(layout.frame.x >= 0 && layout.frame.x + frameWidth <= width, `fits ${width}x${height}`);
-    assert.ok(layout.frame.y - lineHeight / 2 > Math.max(...boxes.map((box) => box[3])));
-    assert.ok(layout.second.y + lineHeight / 2 <= height);
+    for (const line of layout.lines) {
+      assert.ok(line.x >= 0 && line.x + line.width <= width, `fits ${width}x${height}`);
+    }
+    assert.ok(frameLine.y - lineHeight / 2 > Math.max(...boxes.map((box) => box[3])));
+    assert.ok(secondLine.y + lineHeight / 2 <= height);
   }
+});
+
+test('digit cells are as wide as the widest digit in a proportional font', () => {
+  // Like the brand font: "1" is narrow, "4" is the widest digit.
+  const advances = { 0: 0.67, 1: 0.38, 2: 0.58, 3: 0.58, 4: 0.68, 5: 0.58, 6: 0.63, 7: 0.61, 8: 0.65, 9: 0.63 };
+  const proportional = (text, size) => ({
+    width: [...text].reduce((sum, ch) => sum + (advances[ch] ?? 0.6) * size, 0),
+    ascent: 0.97 * size,
+    descent: 0.23 * size,
+  });
+  const boxes = regionBoxes(1920, 1080, 0.25, 0.04);
+  const layout = counterLayout({
+    width: 1920, height: 1080, textSize: 0.12, boxes, pads: { framePad: 4, secondPad: 2 }, measure: proportional,
+  });
+  assert.equal(layout.digitWidth, 0.68 * layout.fontSize);
+  const [frameLine] = layout.lines;
+  assert.equal(frameLine.width, frameLine.prefixWidth + 4 * layout.digitWidth);
+  assert.equal(frameLine.x, (1920 - frameLine.width) / 2); // centred once, never moves
 });
 
 test('the default counter is 12% of the canvas height when it fits', () => {
