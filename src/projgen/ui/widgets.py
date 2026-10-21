@@ -54,7 +54,8 @@ class ColorButton(QPushButton):
     def _refresh(self) -> None:
         r, g, b = (int(round(c * 255)) for c in self._rgb)
         self.setStyleSheet(
-            f"background-color: rgb({r},{g},{b}); border: 1px solid #555; border-radius: 4px;"
+            f"background-color: rgb({r},{g},{b}); "
+            "border: 1px solid rgba(255, 255, 255, 0.55); border-radius: 4px;"
         )
 
 

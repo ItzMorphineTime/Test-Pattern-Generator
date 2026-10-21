@@ -17,6 +17,7 @@ from functools import lru_cache
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+from ..resources import resource_path
 from .config import (
     GridConfig,
     ImageConfig,
@@ -118,14 +119,19 @@ def apply_lines(frame: np.ndarray, cfg: LineGroupConfig, frame_index: int,
 # ---------------------------------------------------------------------------
 # Number grid
 # ---------------------------------------------------------------------------
-@lru_cache(maxsize=8)
+# The brand typeface for burned-in text; Pillow's built-in font is the fallback.
+BRAND_FONT = resource_path("fonts", "Montserrat-SemiBold.ttf")
+
+
+@lru_cache(maxsize=16)
 def load_font(size: int, family: str | None) -> ImageFont.ImageFont:
     size = max(6, int(size))
-    if family:
-        try:
-            return ImageFont.truetype(family, size)
-        except OSError:
-            pass
+    for candidate in (family, str(BRAND_FONT)):
+        if candidate:
+            try:
+                return ImageFont.truetype(candidate, size)
+            except OSError:
+                continue
     try:
         return ImageFont.load_default(size=size)  # Pillow >= 10.1: scalable
     except TypeError:  # very old Pillow

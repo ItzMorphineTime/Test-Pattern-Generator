@@ -22,16 +22,15 @@ ROOT = os.path.abspath(os.path.join(SPECPATH, ".."))
 SRC = os.path.join(ROOT, "src")
 
 ASSETS = os.path.join(SRC, "projgen", "assets")
-# The window/taskbar icon (loaded at runtime) is always the .ico; the platform
-# icon embedded into the executable differs (.icns on macOS, .ico on Windows).
-RUNTIME_ICON = os.path.join(ASSETS, "icon.ico")
+# The icon embedded into the executable: .icns on macOS, .ico on Windows. (The
+# window/taskbar icon is loaded at runtime from the bundled assets.)
 EXE_ICON = os.path.join(ASSETS, "icon.icns" if IS_MAC else "icon.ico")
 
 datas, binaries, hiddenimports = [], [], []
 
-# Bundle the icons so the runtime window/taskbar icon works in the frozen app.
-if os.path.exists(RUNTIME_ICON):
-    datas.append((RUNTIME_ICON, "projgen/assets"))
+# Bundle every asset: the icons, the brand wordmark, the Montserrat fonts (also
+# used for burned-in text), and the stylesheet's arrow images.
+datas.append((ASSETS, "projgen/assets"))
 
 # PyAV ships the FFmpeg shared libraries inside its package; collect them all so
 # every codec (x264/x265/vp9/av1/prores/ffv1) is available in the frozen app.

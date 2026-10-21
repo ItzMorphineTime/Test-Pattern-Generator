@@ -7,7 +7,7 @@ import sys
 from enum import Enum
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QFont, QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -21,7 +21,9 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
-    QTabWidget,
+    QStackedWidget,
+    QTabBar,
+    QVBoxLayout,
     QWidget,
 )
 
@@ -35,12 +37,12 @@ from ..core.config import (
     ProjectConfig,
 )
 from ..core.render import FrameRenderer
-from ..resources import icon_path
+from ..resources import icon_path, resource_path
 from .burst_page import BurstPage
 from .export_bar import ExportBar
 from .preview import PREVIEW_MAX, PreviewWidget
 from .render_worker import ExportJob
-from .style import DARK_QSS
+from .style import BRAND_QSS, FONT_FAMILY, load_brand_fonts, svg_pixmap
 from .widgets import (
     ColorButton,
     OutputGroup,
@@ -74,13 +76,16 @@ class MainWindow(QMainWindow):
                                              self.export_bar)
         self.burst_page = BurstPage(self.config.burst)
 
-        self.tabs = QTabWidget()
-        self.tabs.setDocumentMode(True)
-        self.tabs.addTab(loop_page, "Colour Loop")
-        self.tabs.addTab(self.burst_page, "Black && Burst")
-        self.tabs.setCornerWidget(self._build_preset_buttons(), Qt.TopRightCorner)
-        self.tabs.currentChanged.connect(self._on_tab_changed)
-        self.setCentralWidget(self.tabs)
+        self.pages = QStackedWidget()
+        self.pages.addWidget(loop_page)
+        self.pages.addWidget(self.burst_page)
+        central = QWidget()
+        column = QVBoxLayout(central)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(0)
+        column.addWidget(self._build_header())
+        column.addWidget(self.pages, 1)
+        self.setCentralWidget(central)
         self.statusBar().showMessage("Ready")
 
         self._refresh_timer = QTimer(self)
@@ -340,6 +345,35 @@ class MainWindow(QMainWindow):
         if path:
             self.w_image_path.setText(path)
 
+    def _build_header(self) -> QWidget:
+        """The Morph wordmark, the tool tabs, and the preset buttons."""
+        header = QWidget()
+        header.setObjectName("header")
+        # The wordmark is 36 px tall; 84 px leaves the brand's 24 px clear space.
+        header.setFixedHeight(84)
+        layout = QHBoxLayout(header)
+        layout.setContentsMargins(24, 0, 24, 0)
+        layout.setSpacing(0)
+
+        wordmark = QLabel()
+        wordmark.setPixmap(svg_pixmap(resource_path("brand", "morph-wordmark-dark.svg"),
+                                      124, self.devicePixelRatioF()))
+        wordmark.setAccessibleName("Morph")
+        layout.addWidget(wordmark, 0, Qt.AlignVCenter)
+        layout.addSpacing(40)
+
+        self.tabs = QTabBar()
+        self.tabs.setObjectName("mainTabs")
+        self.tabs.setDrawBase(False)
+        self.tabs.setExpanding(False)
+        self.tabs.addTab("Colour Loop")
+        self.tabs.addTab("Black && Burst")
+        self.tabs.currentChanged.connect(self._on_tab_changed)
+        layout.addWidget(self.tabs, 0, Qt.AlignVCenter)
+        layout.addStretch(1)
+        layout.addWidget(self._build_preset_buttons(), 0, Qt.AlignVCenter)
+        return header
+
     def _build_preset_buttons(self) -> QWidget:
         load = QPushButton("Load Preset...")
         save = QPushButton("Save Preset...")
@@ -347,9 +381,7 @@ class MainWindow(QMainWindow):
         save.setToolTip("Save the settings of every tab to a preset file.")
         load.clicked.connect(self._load_preset)
         save.clicked.connect(self._save_preset)
-        corner = row(load, save)
-        corner.layout().setContentsMargins(0, 4, 8, 4)
-        return corner
+        return row(load, save)
 
     # ------------------------------------------------------------------
     # State plumbing
@@ -452,7 +484,8 @@ class MainWindow(QMainWindow):
         return lambda progress, cancel: encoder.encode(cfg, progress=progress,
                                                        cancel=cancel)
 
-    def _on_tab_changed(self, _index: int) -> None:
+    def _on_tab_changed(self, index: int) -> None:
+        self.pages.setCurrentIndex(index)
         # Only the visible tab's preview should spend time rendering.
         self.preview.pause()
         self.burst_page.preview.pause()
@@ -471,9 +504,16 @@ class MainWindow(QMainWindow):
         super().closeEvent(event)
 
 
+def apply_theme(app: QApplication) -> None:
+    """Load the brand fonts and stylesheet into `app`."""
+    if load_brand_fonts():
+        app.setFont(QFont(FONT_FAMILY, 10))
+    app.setStyleSheet(BRAND_QSS)
+
+
 def run() -> int:
     app = QApplication.instance() or QApplication(sys.argv)
-    app.setStyleSheet(DARK_QSS)
+    apply_theme(app)
     if icon_path():
         app.setWindowIcon(QIcon(icon_path()))
     window = MainWindow()

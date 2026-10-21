@@ -69,7 +69,6 @@ class ExportBar(QWidget):
         self.export_btn.setObjectName("primary")
         self.export_btn.clicked.connect(self._start)
         self.cancel_btn = QPushButton("Cancel")
-        self.cancel_btn.setObjectName("danger")
         self.cancel_btn.clicked.connect(self._cancel)
         self.cancel_btn.hide()
         action_row.addWidget(self.progress, 1)

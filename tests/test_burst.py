@@ -106,8 +106,21 @@ def test_labels_and_numbering_start():
 
 def test_text_shrinks_to_fit_a_portrait_canvas():
     tall = burst.BurstRenderer(_cfg(width=108, height=192, text_size=0.3))
-    assert tall._frame_xy[0] >= 0 and tall._second_xy[0] >= 0
+    for line in tall.counter_lines:
+        assert line.x >= 0 and line.x + line.width <= 108
     tall.render(0)  # must not raise
+
+
+def test_counters_do_not_shift_when_digits_change_width():
+    # "1" is much narrower than "4" in the brand font; fixed-width digit cells
+    # keep the "FRAME " prefix pixel-identical across these frames.
+    r = burst.BurstRenderer(_cfg(width=640, height=360))
+    line = r.counter_lines[0]
+    rows = slice(round(line.y - r.font_size), round(line.y + r.font_size))
+    cols = slice(round(line.x), round(line.x + line.prefix_width) - 2)
+    one, four = r.render(1), r.render(4)  # same background and region
+    assert np.array_equal(one[rows, cols], four[rows, cols])
+    assert not np.array_equal(one, four)  # but the digits did change
 
 
 # --- export -----------------------------------------------------------------

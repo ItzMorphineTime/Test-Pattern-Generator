@@ -44,6 +44,16 @@ class BurstFrame:
     white: bool           # white background this second
 
 
+@dataclass(frozen=True)
+class CounterLine:
+    prefix: str           # "FRAME " or "SECOND "
+    pad: int              # digits shown, zero-padded
+    x: float              # left edge of the line
+    y: float              # vertical middle of the line
+    prefix_width: float
+    width: float          # whole line: prefix plus pad fixed-width digit cells
+
+
 def frame_at(index: int, fps: float) -> BurstFrame:
     n = frames_per_second(fps)
     second, within = divmod(index, n)
@@ -114,38 +124,47 @@ class BurstRenderer:
         return boxes
 
     def _layout_text(self) -> None:
-        """Size the counters to fit below the regions; fix their positions.
+        """Size the counters to fit below the regions and fix their positions.
 
-        Each line is left-anchored at the position that centres its widest
-        possible label, so the text never shifts as the numbers change.
+        Digits are drawn one per fixed-width cell (the width of the widest
+        digit), because the brand font's figures are proportional; with
+        constant-width lines centred once, the counters never shift or wobble
+        as the numbers change.
         """
         w, h = self.width, self.height
         margin = max(1, round(0.03 * h))
         area_top = max(box[3] for box in self.boxes) + 1 + margin
         area_bottom = h - margin
         avail = max(1, area_bottom - area_top)
-        widest_frame = "FRAME " + "8" * self._frame_pad
-        widest_second = "SECOND " + "8" * self._second_pad
+        lines = (("FRAME ", self._frame_pad), ("SECOND ", self._second_pad))
 
-        size = max(6, round(self.cfg.text_size * h))
-        for _ in range(4):
+        def measure(size):
             font = load_font(size, None)
             ascent, descent = font.getmetrics()
             line_h = ascent + descent
-            line_gap = round(0.25 * line_h)
-            widest = max(font.getlength(widest_frame), font.getlength(widest_second))
-            scale = min(1.0, 0.9 * w / max(1.0, widest),
+            digit_w = max(font.getlength(d) for d in "0123456789")
+            widths = [font.getlength(prefix) + pad * digit_w for prefix, pad in lines]
+            return font, line_h, round(0.25 * line_h), digit_w, widths
+
+        size = max(6, round(self.cfg.text_size * h))
+        for _ in range(4):
+            _, line_h, line_gap, _, widths = measure(size)
+            scale = min(1.0, 0.9 * w / max(1.0, max(widths)),
                         0.9 * avail / max(1, 2 * line_h + line_gap))
             if scale >= 0.99 or size <= 6:
                 break
             size = max(6, int(size * scale))
 
+        font, line_h, line_gap, digit_w, widths = measure(size)
         self.font = font
         self.font_size = size
+        self.digit_width = digit_w
         centre_y = (area_top + area_bottom) / 2
         offset = (line_h + line_gap) / 2
-        self._frame_xy = ((w - font.getlength(widest_frame)) / 2, centre_y - offset)
-        self._second_xy = ((w - font.getlength(widest_second)) / 2, centre_y + offset)
+        self.counter_lines = [
+            CounterLine(prefix, pad, (w - width) / 2, y, font.getlength(prefix), width)
+            for (prefix, pad), width, y in zip(lines, widths, (centre_y - offset, centre_y + offset))
+        ]
 
     # -- rendering -------------------------------------------------------
     def labels(self, frame: BurstFrame) -> tuple[str, str]:
@@ -167,9 +186,12 @@ class BurstRenderer:
         img = self._base(frame.white, frame.region).copy()
         draw = ImageDraw.Draw(img)
         ink = BLACK if frame.white else WHITE
-        frame_text, second_text = self.labels(frame)
-        draw.text(self._frame_xy, frame_text, font=self.font, fill=ink, anchor="lm")
-        draw.text(self._second_xy, second_text, font=self.font, fill=ink, anchor="lm")
+        start = self.cfg.start_number
+        for line, number in zip(self.counter_lines, (frame.index + start, frame.second + start)):
+            draw.text((line.x, line.y), line.prefix, font=self.font, fill=ink, anchor="lm")
+            for i, digit in enumerate(f"{number:0{line.pad}d}"):
+                cell_centre = line.x + line.prefix_width + (i + 0.5) * self.digit_width
+                draw.text((cell_centre, line.y), digit, font=self.font, fill=ink, anchor="mm")
         return np.array(img)
 
     def iter_frames(self) -> Iterator[np.ndarray]:
