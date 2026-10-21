@@ -11,7 +11,7 @@ import {
   framePng,
   saveFramesToFolder,
 } from './frames.js';
-import { BurstRenderer, loadFonts } from './renderer.js';
+import { BurstRenderer, loadAssets } from './renderer.js';
 import { fileBase, fromQuery, normalise, summary, toQuery, validate } from './settings.js';
 import { downloadBlob, formatBytes } from './util.js';
 import { encodeMp4, findEncoderConfig } from './video.js';
@@ -303,5 +303,10 @@ window.addEventListener('beforeunload', (event) => {
 
 $('save-folder').hidden = !canSaveToFolder();
 writeForm(state.settings);
-await loadFonts(); // so the first preview is laid out in the brand font
-applySettings(state.settings);
+try {
+  await loadAssets(); // the brand font and monograms, before the first preview
+  applySettings(state.settings);
+} catch (error) {
+  console.error(error);
+  setStatus(error?.message || String(error), true);
+}

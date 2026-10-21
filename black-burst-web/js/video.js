@@ -7,7 +7,7 @@
  */
 
 import { Mp4Writer } from './mp4.js';
-import { BurstRenderer, createCanvas, loadFonts } from './renderer.js';
+import { BurstRenderer, createCanvas, loadAssets } from './renderer.js';
 import { fpsFraction, framesPerSecond } from './timing.js';
 import { makeYielder } from './util.js';
 
@@ -76,7 +76,7 @@ export async function encodeMp4(settings, { quality = 'standard', onProgress, si
   const { config, reason } = await findEncoderConfig(settings, quality);
   if (!config) throw new Error(reason);
 
-  await loadFonts();
+  await loadAssets();
   const { canvas, ctx } = createCanvas(settings.width, settings.height);
   const renderer = new BurstRenderer(settings, ctx);
   const { num, den } = fpsFraction(settings.fps);

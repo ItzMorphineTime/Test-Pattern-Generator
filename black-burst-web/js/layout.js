@@ -1,14 +1,60 @@
 /**
  * Layout maths for the black & burst frame (no canvas, so it is unit-testable):
- * where the three colour regions sit and how the counters are sized and placed.
- * Matches the desktop renderer.
+ * where the three colour regions and the brand mark sit, which monogram the
+ * mark uses, and how the counters are sized and placed. Matches the desktop
+ * renderer.
  */
 
 import { frameAt, roundHalfEven } from './timing.js';
 
 export const REGION_COLOURS = ['#ff0000', '#00ff00', '#0000ff'];
+export const MONOGRAM_ASPECT = 344 / 466; // Morph monogram artwork, height / width
+// Below this WCAG relative luminance, white contrasts more than black.
+export const LIGHT_THRESHOLD = 0.179;
 
 const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
+
+/**
+ * Where the Morph monogram sits on every frame: bottom-right, 5% of the frame
+ * width (capped at 8% of the height for very wide frames), inset by 3% of the
+ * frame height: 96x71 px with a 32 px margin at 1080p.
+ */
+export function markBox(width, height) {
+  let w = 0.05 * width;
+  let h = w * MONOGRAM_ASPECT;
+  if (h > 0.08 * height) {
+    h = 0.08 * height;
+    w = h / MONOGRAM_ASPECT;
+  }
+  w = Math.max(1, roundHalfEven(w));
+  h = Math.max(1, roundHalfEven(h));
+  const margin = Math.max(1, roundHalfEven(0.03 * height));
+  return { x: width - margin - w, y: height - margin - h, w, h };
+}
+
+const LINEAR = Float64Array.from({ length: 256 }, (_, value) => {
+  const c = value / 255;
+  return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+});
+
+/** Mean WCAG relative luminance of RGBA pixels (`ImageData.data`): 0 black, 1 white. */
+export function relativeLuminance(rgba) {
+  const count = Math.floor(rgba.length / 4);
+  let sum = 0;
+  for (let i = 0; i < count * 4; i += 4) {
+    sum += 0.2126 * LINEAR[rgba[i]] + 0.7152 * LINEAR[rgba[i + 1]] + 0.0722 * LINEAR[rgba[i + 2]];
+  }
+  return count ? sum / count : 0;
+}
+
+/**
+ * The monogram that contrasts with a background of this luminance, by the
+ * brand's own rule: 'dark' (white M) on dark backgrounds, 'light' (black M)
+ * on light ones.
+ */
+export function markVariant(luminance) {
+  return luminance > LIGHT_THRESHOLD ? 'light' : 'dark';
+}
 
 /**
  * Three equal boxes across the top, with equal gaps around and between.
@@ -57,12 +103,13 @@ export function counterLabels(frame, startNumber, pads) {
  * `size` px. Digits are drawn one per fixed-width cell (the width of the
  * widest digit), because the brand font's figures are proportional; with
  * constant-width lines centred once, the counters never shift as the numbers
- * change. Each line's `y` is its vertical middle.
+ * change. Each line's `y` is its vertical middle. The counters stay above
+ * `bottomLimit` (the top of the brand mark).
  */
-export function counterLayout({ width, height, textSize, boxes, pads, measure }) {
+export function counterLayout({ width, height, textSize, boxes, pads, measure, bottomLimit = height }) {
   const margin = Math.max(1, roundHalfEven(0.03 * height));
   const areaTop = Math.max(...boxes.map((box) => box[3])) + 1 + margin;
-  const areaBottom = height - margin;
+  const areaBottom = bottomLimit - margin;
   const avail = Math.max(1, areaBottom - areaTop);
   const lines = [['FRAME ', pads.framePad], ['SECOND ', pads.secondPad]];
 

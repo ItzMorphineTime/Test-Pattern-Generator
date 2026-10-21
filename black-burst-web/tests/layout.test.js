@@ -1,7 +1,16 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { counterLabels, counterLayout, counterPads, regionBoxes } from '../js/layout.js';
+import {
+  counterLabels,
+  counterLayout,
+  counterPads,
+  markBox,
+  markVariant,
+  MONOGRAM_ASPECT,
+  regionBoxes,
+  relativeLuminance,
+} from '../js/layout.js';
 import { frameAt } from '../js/timing.js';
 
 // A stand-in font: fixed-width characters, roughly the proportions of a sans-serif.
@@ -72,4 +81,46 @@ test('labels pad to the widest number and honour the start number', () => {
   assert.deepEqual(counterLabels(frameAt(45, 30), 0, pads), ['FRAME 0045', 'SECOND 01']);
   assert.deepEqual(counterLabels(frameAt(0, 30), 1, counterPads(300, 30, 1)), ['FRAME 0001', 'SECOND 01']);
   assert.deepEqual(counterPads(108000, 30, 0), { framePad: 6, secondPad: 4 });
+});
+
+test('the Morph monogram sits bottom-right at a twentieth of the width, like the desktop app', () => {
+  assert.deepEqual(markBox(1920, 1080), { x: 1792, y: 977, w: 96, h: 71 });
+  const uhd = markBox(3840, 2160);
+  assert.deepEqual([uhd.w, 3840 - uhd.x - uhd.w, 2160 - uhd.y - uhd.h], [192, 65, 65]);
+  const wide = markBox(3840, 540);
+  assert.ok(wide.h <= Math.round(0.08 * 540));
+  assert.ok(Math.abs(wide.h / wide.w - MONOGRAM_ASPECT) / MONOGRAM_ASPECT < 0.03);
+});
+
+test('the monogram variant gives the M more contrast with the pixels behind it', () => {
+  const solid = ([r, g, b]) => Uint8ClampedArray.from({ length: 64 * 4 }, (_, i) => [r, g, b, 255][i % 4]);
+  const cases = [
+    [[0, 0, 0], 'dark'], // white M on black
+    [[255, 255, 255], 'light'], // black M on white
+    [[230, 220, 30], 'light'], // yellow is bright
+    [[30, 40, 220], 'dark'], // blue is dark
+    [[128, 128, 128], 'light'], // mid grey sits just above the crossover
+    [[100, 100, 100], 'dark'],
+  ];
+  for (const [rgb, expected] of cases) {
+    assert.equal(markVariant(relativeLuminance(solid(rgb))), expected, `rgb(${rgb})`);
+  }
+});
+
+test('luminance is the mean over every pixel and ignores alpha', () => {
+  assert.equal(relativeLuminance(Uint8ClampedArray.of(0, 0, 0, 255)), 0);
+  assert.equal(relativeLuminance(Uint8ClampedArray.of(255, 255, 255, 0)), 1);
+  const half = Uint8ClampedArray.of(0, 0, 0, 255, 255, 255, 255, 255);
+  assert.ok(Math.abs(relativeLuminance(half) - 0.5) < 1e-12);
+  assert.equal(relativeLuminance(new Uint8ClampedArray(0)), 0);
+});
+
+test('the counters stay above the mark, even at the largest size', () => {
+  const boxes = regionBoxes(1920, 1080, 0.25, 0.04);
+  const mark = markBox(1920, 1080);
+  const layout = counterLayout({
+    width: 1920, height: 1080, textSize: 0.4, boxes, pads: { framePad: 4, secondPad: 2 },
+    measure, bottomLimit: mark.y,
+  });
+  for (const line of layout.lines) assert.ok(line.y + (1.2 * layout.fontSize) / 2 <= mark.y);
 });

@@ -4,7 +4,7 @@
  * Files are named after their burned-in frame number.
  */
 
-import { BurstRenderer, createCanvas, loadFonts } from './renderer.js';
+import { BurstRenderer, createCanvas, loadAssets } from './renderer.js';
 import { frameFilePad, totalFrames } from './timing.js';
 import { canvasToBlob, makeYielder } from './util.js';
 import { MAX_ZIP_ENTRIES, ZipWriter } from './zip.js';
@@ -23,7 +23,7 @@ export function fitsInZip(settings) {
 }
 
 export async function framePng(settings, index) {
-  await loadFonts();
+  await loadAssets();
   const { canvas, ctx } = createCanvas(settings.width, settings.height);
   new BurstRenderer(settings, ctx).draw(ctx, index);
   return canvasToBlob(canvas);
@@ -49,7 +49,7 @@ export async function saveFramesToFolder(settings, folder, options) {
 }
 
 async function eachFrame(settings, save, { onProgress, signal } = {}) {
-  await loadFonts();
+  await loadAssets();
   const { canvas, ctx } = createCanvas(settings.width, settings.height);
   const renderer = new BurstRenderer(settings, ctx);
   const yieldToBrowser = makeYielder();

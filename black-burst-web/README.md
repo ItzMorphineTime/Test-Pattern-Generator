@@ -35,6 +35,7 @@ follows the same timing rules exactly.
 | Background | Black on even seconds (0, 2, …), white on odd seconds |
 | Colour regions | The region for frame `f` of an `n`-frame second is `⌊3f / n⌋`; uneven rates give the spare frames to the earlier colours (25 fps → 9/8/8) |
 | Counters | Digits sit in fixed-width cells, so the text never shifts as the numbers change |
+| Brand mark | The Morph monogram, bottom-right at 5% of the frame width: the white M on black seconds, the black M on white ones. The counters always sit above it |
 
 The PNG frames are pixel-exact. H.264's 4:2:0 colour conversion shifts the pure
 colours by a level or two (red comes out as 253,0,0); use the PNG frames when you
@@ -87,7 +88,7 @@ files.
 | File | Role |
 |---|---|
 | `js/timing.js` | Frame timing, matching the desktop app (including Python-style rounding) |
-| `js/layout.js` | Region boxes and counter layout (pure maths, unit-tested) |
+| `js/layout.js` | Region boxes, counter layout, and the brand mark's position and variant (pure maths, unit-tested) |
 | `js/renderer.js` | Draws frames on a canvas |
 | `js/video.js` | WebCodecs H.264 encoding, with profile and level selection |
 | `js/mp4.js` | A minimal fast-start MP4 writer, including reordered (B-frame) streams |
@@ -100,6 +101,14 @@ files.
 Styled to the Morph Brand System V2: Morph Black, Studio White, Signal Red for motion
 and Pivot Gold for the one decisive action, set in Montserrat. The page follows the
 visitor's light or dark system setting, using the brand's tokens for each mode.
+
+Every frame you download, as video or PNG, carries the Morph monogram in its
+bottom-right corner. The renderer measures the pixels behind the mark and picks the
+variant that contrasts with them, following the brand's rule: the dark-background
+monogram (white M) over dark pixels, the light one (black M) over light pixels. The
+choice is the mean WCAG relative luminance of those pixels, switching at 0.179, where
+black and white contrast equally. The artwork is shown as supplied, never recoloured,
+stretched or faded.
 
 ## Licences
 
